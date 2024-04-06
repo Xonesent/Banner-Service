@@ -33,6 +33,9 @@ type Config struct {
 		PoolTimeout  int    `validate:"required"`
 		Password     string `validate:"required"`
 	}
+	BannerSettings struct {
+		BannerTTLSeconds int `validate:"required"`
+	}
 }
 
 func LoadConfig() (c *Config, err error) {

@@ -1,6 +1,11 @@
 package middleware
 
-import "avito/assignment/config"
+import (
+	"avito/assignment/config"
+	"avito/assignment/pkg/traces"
+	"avito/assignment/pkg/utilities"
+	"github.com/gofiber/fiber/v2"
+)
 
 type MDWManager struct {
 	cfg *config.Config
@@ -8,4 +13,22 @@ type MDWManager struct {
 
 func NewOfficiantMiddleware(cfg *config.Config) *MDWManager {
 	return &MDWManager{cfg: cfg}
+}
+
+func (m *MDWManager) CheckAuthToken(restrictions []string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		_, span := traces.StartFiberTrace(c, "MDWManager.CheckAuthToken")
+		defer span.End()
+
+		token := c.Get("token")
+		if token == "" {
+			return fiber.ErrUnauthorized
+		} else if !utilities.InStringSlice(token, restrictions) {
+			return fiber.ErrForbidden
+		}
+
+		c.Locals("token", token)
+
+		return c.Next()
+	}
 }

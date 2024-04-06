@@ -21,5 +21,8 @@
     "PoolSize": 10,
     "PoolTimeout": 10,
     "Password": "test"
+  },
+  "BannerSettings": {
+    "BannerTTLSeconds":300
   }
 }
