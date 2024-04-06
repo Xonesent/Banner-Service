@@ -1,0 +1,25 @@
+{
+  "Server": {
+    "Host": "localhost:8892"
+  },
+  "Postgres": {
+    "Host": "localhost",
+    "Port": "54325",
+    "User": "postgres",
+    "Password": "test",
+    "DBName": "avito",
+    "SSLMode": "disable"
+  },
+  "OpenTelemetry": {
+    "URL": "http://localhost:14268/api/traces",
+    "ServiceName": "avito_test"
+  },
+  "Redis": {
+    "Host": "localhost",
+    "Port": "6333",
+    "MinIdleConns": 10,
+    "PoolSize": 10,
+    "PoolTimeout": 10,
+    "Password": "test"
+  }
+}
