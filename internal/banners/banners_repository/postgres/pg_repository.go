@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	sq "github.com/Masterminds/squirrel"
 	trmsqlx "github.com/avito-tech/go-transaction-manager/sqlx"
 	"github.com/gofiber/fiber/v2"
@@ -205,7 +206,37 @@ func (b *BannersRepo) AddBanner(ctx context.Context, params banner_models.AddBan
 	return &bannerId, nil
 }
 
-func (b *BannersRepo) AddTags(ctx context.Context, bannerId int, tagIds int) error {
+func (b *BannersRepo) CheckExist(ctx context.Context, tagId int, featureId int) error {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.GetPossibleBannerIds")
+	defer span.End()
+
+	query, _, err := sq.Select("1").
+		From(fmt.Sprintf("%s b", BannersTableName)).
+		InnerJoin(fmt.Sprintf("%s bxt ON bxt.banner_id = b.banner_id", BannersXTagsTableName)).
+		Where(
+			sq.And{
+				sq.Eq{TagIdColumnName: tagId},
+				sq.Eq{FeatureIdColumnName: featureId},
+			},
+		).
+		PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return err
+	}
+
+	var exists bool
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+	if err = tr.QueryRowxContext(ctx, query, tagId, featureId).Scan(&exists); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if exists {
+		return errors.New(fmt.Sprintf("impossible to add, banner with tagId = %d and featureId = %d already exists", tagId, featureId))
+	}
+	return nil
+}
+
+func (b *BannersRepo) AddTags(ctx context.Context, bannerId int, tagId int) error {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.GetPossibleBannerIds")
 	defer span.End()
 
@@ -213,7 +244,7 @@ func (b *BannersRepo) AddTags(ctx context.Context, bannerId int, tagIds int) err
 		Columns(InsertTagColumns...).
 		Values(
 			bannerId,
-			tagIds,
+			tagId,
 		).
 		PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
@@ -221,8 +252,7 @@ func (b *BannersRepo) AddTags(ctx context.Context, bannerId int, tagIds int) err
 	}
 
 	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
-	_, err = tr.ExecContext(ctx, query, args...)
-	if err != nil {
+	if _, err = tr.ExecContext(ctx, query, args...); err != nil {
 		return err
 	}
 

@@ -134,6 +134,17 @@ func (b *BannersUC) AddBanner(ctx context.Context, params banner_models.AddBanne
 
 	var bannerId *int
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
+		//TODO обдумать более быструю логику добавления баннера = На текущий момент мы
+		// 1) Проверяем можем ли мы добавить баннер (постоянный innerjoin и цикл)
+		// 2) Добавляем баннер
+		// 3) Добавляем тэгайдишники в баннер (по циклу)
+		for _, tagId := range params.TagIds {
+			err := b.bannersRepo.CheckExist(ctx, tagId, params.FeatureId)
+			if err != nil {
+				return err
+			}
+		}
+
 		id, err := b.bannersRepo.AddBanner(ctx, params)
 		if err != nil {
 			return err

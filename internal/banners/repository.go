@@ -12,6 +12,7 @@ type PostgresRepository interface {
 	SelectBanner(ctx context.Context, params banner_models.SelectPostgresBanner) (*[]banner_models.FullBannerContent, error)
 	AddBanner(ctx context.Context, params banner_models.AddBanner) (*int, error)
 	AddTags(ctx context.Context, bannerId int, tagIds int) error
+	CheckExist(ctx context.Context, tagIds int, featureId int) error
 }
 
 type RedisRepository interface {

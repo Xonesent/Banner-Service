@@ -7,6 +7,7 @@ CREATE TABLE banner_schema.banners(
     title TEXT,
     text TEXT,
     url TEXT,
+    feature_id INTEGER,
     created_at TIMESTAMP,
     updated_at TIMESTAMP,
     is_active BOOLEAN
@@ -16,7 +17,6 @@ CREATE TABLE banner_schema.banners_X_tags(
     id     BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     banner_id INTEGER,
     tag_id INTEGER,
-    feature_id INTEGER,
     FOREIGN KEY (banner_id) REFERENCES banner_schema.banners(banner_id)
 );
 
@@ -24,6 +24,6 @@ CREATE TABLE banner_schema.banners_X_tags(
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE IF  EXISTS  banner_schema.banners;
 DROP TABLE IF  EXISTS  banner_schema.banners_X_tags;
+DROP TABLE IF  EXISTS  banner_schema.banners;
 -- +goose StatementEnd
