@@ -7,5 +7,6 @@ import (
 
 type Usecase interface {
 	GetBanner(ctx context.Context, params banner_models.GetBanner) (*banner_models.BannerContent, error)
-	//GetManyBanner(ctx context.Context, params banner_models.GetManyBanner) (*[]banner_models.BannerContent, error)
+	GetManyBanner(ctx context.Context, params banner_models.GetManyBanner) (*[]banner_models.EditedFullBannerContent, error)
+	AddBanner(ctx context.Context, params banner_models.AddBanner) (*int, error)
 }

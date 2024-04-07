@@ -83,3 +83,88 @@ func (b *BannersUC) GetBanner(ctx context.Context, params banner_models.GetBanne
 	}
 	return bannerInfo, nil
 }
+
+func (b *BannersUC) GetManyBanner(ctx context.Context, params banner_models.GetManyBanner) (*[]banner_models.EditedFullBannerContent, error) {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetManyBanner")
+	defer span.End()
+
+	manyBannerInfo := &[]banner_models.EditedFullBannerContent{}
+	err := b.trManager.Do(ctx, func(ctx context.Context) error {
+		var possibleBannerIds []int
+		if params.TagId != 0 {
+			bannerIds, err := b.bannersRepo.GetPossibleBannerIds(ctx, params.TagId)
+			if err != nil {
+				return err
+			}
+			possibleBannerIds = bannerIds
+		}
+
+		manyBanner, err := b.bannersRepo.SelectBanner(ctx, banner_models.SelectPostgresBanner{
+			TagId:             params.TagId,
+			FeatureId:         params.FeatureId,
+			PossibleBannerIds: possibleBannerIds,
+			Offset:            params.Offset,
+			Limit:             params.Limit,
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, banner := range *manyBanner {
+			//TODO Оптимизировать добавление тэгайдишников
+			tagIds, err := b.bannersRepo.GetPossibleTagIds(ctx, banner.BannerId)
+			if err != nil {
+				return err
+			}
+			*manyBannerInfo = append(*manyBannerInfo, banner_models.EditBannerContent(banner, tagIds))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return manyBannerInfo, nil
+}
+
+func (b *BannersUC) AddBanner(ctx context.Context, params banner_models.AddBanner) (*int, error) {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetManyBanner")
+	defer span.End()
+
+	var bannerId *int
+	err := b.trManager.Do(ctx, func(ctx context.Context) error {
+		id, err := b.bannersRepo.AddBanner(ctx, params)
+		if err != nil {
+			return err
+		}
+
+		for _, tagId := range params.TagIds {
+			err = b.bannersRepo.AddTags(ctx, *id, tagId)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err := b.redisClient.PutBanner(ctx, banner_models.PutRedisBanner{
+			TagIds:    params.TagIds,
+			FeatureId: params.FeatureId,
+			Content: banner_models.BannerContent{
+				Title:    params.Content.Title,
+				Text:     params.Content.Text,
+				Url:      params.Content.Url,
+				IsActive: params.IsActive,
+			},
+		}); err != nil {
+			return err
+		}
+
+		bannerId = id
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return bannerId, nil
+}

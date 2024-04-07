@@ -22,4 +22,27 @@ var (
 		UrlColumnName,
 		IsActiveColumnName,
 	}
+	SelectBannerColumns = []string{
+		BannerIdColumnName,
+		FeatureIdColumnName,
+		TitleColumnName,
+		TextColumnName,
+		UrlColumnName,
+		IsActiveColumnName,
+		CreatedAtColumnName,
+		UpdatedAtColumnName,
+	}
+	InsertBannerColumns = []string{
+		TitleColumnName,
+		TextColumnName,
+		UrlColumnName,
+		FeatureIdColumnName,
+		IsActiveColumnName,
+		CreatedAtColumnName,
+		UpdatedAtColumnName,
+	}
+	InsertTagColumns = []string{
+		BannerIdColumnName,
+		TagIdColumnName,
+	}
 )

@@ -52,26 +52,52 @@ func (b *BannersHandlers) GetBanner() fiber.Handler {
 	}
 }
 
-//func (b *BannersHandlers) GetManyBanner() fiber.Handler {
-//	return func(c *fiber.Ctx) error {
-//		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetBanner")
-//		defer span.End()
-//
-//		params := banner_models.GetManyBanner{}
-//		if err := reqvalidator.ReadRequest(c, &params); err != nil {
-//			return traces.SpanSetErrWrapf(
-//				span,
-//				fiber.ErrBadRequest,
-//				"BannersHandlers.GetBanner.ReadRequest(args:%v)",
-//				params,
-//			)
-//		}
-//
-//		bannerInfo, err := b.bannersUC.GetManyBanner(ctx, params)
-//		if err != nil {
-//			return err
-//		}
-//
-//		return c.JSON(fiber.Map{})
-//	}
-//}
+func (b *BannersHandlers) GetManyBanner() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetBanner")
+		defer span.End()
+
+		params := banner_models.GetManyBanner{}
+		if err := reqvalidator.ReadRequest(c, &params); err != nil {
+			return traces.SpanSetErrWrapf(
+				span,
+				fiber.ErrBadRequest,
+				"BannersHandlers.GetBanner.ReadRequest(args:%v)",
+				params,
+			)
+		}
+
+		manyBannerInfo, err := b.bannersUC.GetManyBanner(ctx, params)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(manyBannerInfo)
+	}
+}
+
+func (b *BannersHandlers) AddBanner() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetBanner")
+		defer span.End()
+
+		params := banner_models.AddBanner{}
+		if err := reqvalidator.ReadRequest(c, &params); err != nil {
+			return traces.SpanSetErrWrapf(
+				span,
+				fiber.ErrBadRequest,
+				"BannersHandlers.GetBanner.ReadRequest(args:%v)",
+				params,
+			)
+		}
+
+		bannerId, err := b.bannersUC.AddBanner(ctx, params)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(fiber.Map{
+			"banner_id": bannerId,
+		})
+	}
+}

@@ -9,8 +9,8 @@ import (
 
 func MapBannersRoutes(group fiber.Router, h banners.Handlers, mw *middleware.MDWManager) {
 	group.Get("/user_banner", mw.CheckAuthToken(constant.AllRoles), h.GetBanner())
-	group.Get("/banner", mw.CheckAuthToken(constant.AdminRoles))
-	group.Post("/banner", mw.CheckAuthToken(constant.AdminRoles))
+	group.Get("/banner", mw.CheckAuthToken(constant.AdminRoles), h.GetManyBanner())
+	group.Post("/banner", mw.CheckAuthToken(constant.AdminRoles), h.AddBanner())
 	group.Patch("/banner/:banner_id", mw.CheckAuthToken(constant.AdminRoles))
 	group.Delete("/banner/:banner_id", mw.CheckAuthToken(constant.AdminRoles))
 }
