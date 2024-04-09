@@ -2,121 +2,113 @@ package banners_usecase
 
 import (
 	"avito/assignment/config"
-	banners_postgres "avito/assignment/internal/banners/banners_repository/postgres"
-	banners_redis "avito/assignment/internal/banners/banners_repository/redis"
-	"avito/assignment/internal/models/banner_models"
+	"avito/assignment/internal/banners/banners_repository"
+	"avito/assignment/internal/models"
 	"avito/assignment/pkg/constant"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/avito-tech/go-transaction-manager/trm/manager"
 	"github.com/gofiber/fiber/v2"
 	"go.opentelemetry.io/otel"
 )
 
 type BannersUC struct {
-	cfg         *config.Config
-	trManager   *manager.Manager
-	bannersRepo *banners_postgres.BannersRepo
-	redisClient *banners_redis.ClientRedisRepo
+	cfg              *config.Config
+	trManager        *manager.Manager
+	bannersPGRepo    PostgresRepository
+	bannersRedisRepo RedisRepository
 }
 
-func NewBannersUC(cfg *config.Config, trManager *manager.Manager, bannersRepo *banners_postgres.BannersRepo, redisClient *banners_redis.ClientRedisRepo) *BannersUC {
+func NewBannersUC(cfg *config.Config, trManager *manager.Manager, bannersRepo PostgresRepository, redisClient RedisRepository) *BannersUC {
 	return &BannersUC{
-		cfg:         cfg,
-		trManager:   trManager,
-		bannersRepo: bannersRepo,
-		redisClient: redisClient,
+		cfg:              cfg,
+		trManager:        trManager,
+		bannersPGRepo:    bannersRepo,
+		bannersRedisRepo: redisClient,
 	}
 }
 
-func (b *BannersUC) GetBanner(ctx context.Context, params banner_models.GetBanner) (*banner_models.BannerContent, error) {
+func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (*models.FullBanner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetBanner")
 	defer span.End()
 
-	bannerInfo := &banner_models.BannerContent{}
-	if !params.UseLastVersion {
-		bannerInfo, err := b.redisClient.GetBanner(ctx, banner_models.GetRedisBanner{
-			TagId:     params.TagId,
-			FeatureId: params.FeatureId,
-		})
+	if !getBannerParams.UseLastVersion {
+		fullBanner, err := b.bannersRedisRepo.GetBannerRedis(ctx, getBannerParams.ToGetBannerRedis())
 		if err != nil && !errors.Is(err, fiber.ErrNotFound) {
 			return nil, err
 		}
-		if bannerInfo != nil {
-			if bannerInfo.IsActive == false && params.AuthToken == constant.UserToken {
-				return nil, fiber.ErrNotFound
+		if fullBanner != nil {
+			if fullBanner.IsActive == false && getBannerParams.AuthToken == constant.UserToken {
+				return nil, fiber.NewError(fiber.ErrNotFound.Code, fmt.Sprintf("BannersUC.GetBanner.NotAdmin; err = %s", err.Error()))
 			}
-			return bannerInfo, nil
+			return fullBanner, nil
 		}
 	}
 
+	fullBanner := &models.FullBanner{}
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		possibleBannerIds, err := b.bannersRepo.GetPossibleBannerIds(ctx, params.TagId)
+		possibleBannerIds, err := b.bannersPGRepo.GetPossibleBannerIds(ctx, getBannerParams.TagId)
 		if err != nil {
 			return err
 		}
-		bannerInfo, err = b.bannersRepo.GetBanner(ctx, banner_models.GetPostgresBanner{
-			FeatureId:         params.FeatureId,
+		banner, err := b.bannersPGRepo.GetBannerPostgres(ctx, &banners_repository.GetPostgresBanner{
+			FeatureId:         getBannerParams.FeatureId,
 			PossibleBannerIds: possibleBannerIds,
 		})
 		if err != nil {
 			return err
 		}
+		possibleTagIds, err := b.bannersPGRepo.GetPossibleTagIds(ctx, banner.BannerId)
+		if err != nil {
+			return err
+		}
+		fullBanner = banner.ToFullBanner(possibleTagIds)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if !params.UseLastVersion {
-		if err := b.redisClient.PutBanner(ctx, banner_models.PutRedisBanner{
-			TagIds:    []int{params.TagId},
-			FeatureId: params.FeatureId,
-			Content:   *bannerInfo,
-		}); err != nil {
+	if !getBannerParams.UseLastVersion {
+		if err = b.bannersRedisRepo.PutBannerRedis(ctx, ToPutRedisBanner(fullBanner)); err != nil {
 			return nil, err
 		}
 	}
 
-	if bannerInfo.IsActive == false && params.AuthToken == constant.UserToken {
-		return nil, fiber.ErrNotFound
+	if fullBanner.IsActive == false && getBannerParams.AuthToken == constant.UserToken {
+		return nil, fiber.NewError(fiber.StatusNotFound, fmt.Sprintf("ClientRedisRepo.GetBannerRedis.Get; err = %s", err.Error()))
 	}
-	return bannerInfo, nil
+	return fullBanner, nil
 }
 
-func (b *BannersUC) GetManyBanner(ctx context.Context, params banner_models.GetManyBanner) (*[]banner_models.EditedFullBannerContent, error) {
+func (b *BannersUC) GetManyBanner(ctx context.Context, getManyBannerParams *GetManyBanner) (*[]models.FullBanner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetManyBanner")
 	defer span.End()
 
-	manyBannerInfo := &[]banner_models.EditedFullBannerContent{}
+	manyBannerInfo := &[]models.FullBanner{}
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		var possibleBannerIds []int
-		if params.TagId != 0 {
-			bannerIds, err := b.bannersRepo.GetPossibleBannerIds(ctx, params.TagId)
+		var possibleBannerIds []models.BannerId
+		if getManyBannerParams.TagId != nil {
+			bannerIds, err := b.bannersPGRepo.GetPossibleBannerIds(ctx, *getManyBannerParams.TagId)
 			if err != nil {
 				return err
 			}
 			possibleBannerIds = bannerIds
 		}
 
-		manyBanner, err := b.bannersRepo.SelectBanner(ctx, banner_models.SelectPostgresBanner{
-			TagId:             params.TagId,
-			FeatureId:         params.FeatureId,
-			PossibleBannerIds: possibleBannerIds,
-			Offset:            params.Offset,
-			Limit:             params.Limit,
-		})
+		manyBanner, err := b.bannersPGRepo.GetManyBannerPostgres(ctx, getManyBannerParams.ToGetManyPostgresBanner(possibleBannerIds))
 		if err != nil {
 			return err
 		}
 
 		for _, banner := range *manyBanner {
 			//TODO Оптимизировать добавление тэгайдишников
-			tagIds, err := b.bannersRepo.GetPossibleTagIds(ctx, banner.BannerId)
+			tagIds, err := b.bannersPGRepo.GetPossibleTagIds(ctx, banner.BannerId)
 			if err != nil {
 				return err
 			}
-			*manyBannerInfo = append(*manyBannerInfo, banner_models.EditBannerContent(banner, tagIds))
+			*manyBannerInfo = append(*manyBannerInfo, *banner.ToFullBanner(tagIds))
 		}
 
 		return nil
@@ -128,53 +120,44 @@ func (b *BannersUC) GetManyBanner(ctx context.Context, params banner_models.GetM
 	return manyBannerInfo, nil
 }
 
-func (b *BannersUC) AddBanner(ctx context.Context, params banner_models.AddBanner) (*int, error) {
+func (b *BannersUC) AddBanner(ctx context.Context, addBannerParams *AddBanner) (models.BannerId, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetManyBanner")
 	defer span.End()
 
-	var bannerId *int
+	var bannerId models.BannerId
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
 		//TODO обдумать более быструю логику добавления баннера = На текущий момент мы
 		// 1) Проверяем можем ли мы добавить баннер (постоянный innerjoin и цикл)
 		// 2) Добавляем баннер
 		// 3) Добавляем тэгайдишники в баннер (по циклу)
-		for _, tagId := range params.TagIds {
-			err := b.bannersRepo.CheckExist(ctx, tagId, params.FeatureId)
+		for _, tagId := range addBannerParams.TagIds {
+			err := b.bannersPGRepo.CheckExist(ctx, &banners_repository.CheckExistBanner{TagId: tagId, FeatureId: addBannerParams.FeatureId})
 			if err != nil {
 				return err
 			}
 		}
 
-		id, err := b.bannersRepo.AddBanner(ctx, params)
+		insertParams, err := b.bannersPGRepo.AddBannerPostgres(ctx, addBannerParams.ToAddBannerPostgres())
 		if err != nil {
 			return err
 		}
 
-		for _, tagId := range params.TagIds {
-			err = b.bannersRepo.AddTags(ctx, *id, tagId)
+		for _, tagId := range addBannerParams.TagIds {
+			err = b.bannersPGRepo.AddTags(ctx, &banners_repository.AddTagsPostgres{TagId: tagId, BannerId: insertParams.BannerId})
 			if err != nil {
 				return err
 			}
 		}
 
-		if err := b.redisClient.PutBanner(ctx, banner_models.PutRedisBanner{
-			TagIds:    params.TagIds,
-			FeatureId: params.FeatureId,
-			Content: banner_models.BannerContent{
-				Title:    params.Content.Title,
-				Text:     params.Content.Text,
-				Url:      params.Content.Url,
-				IsActive: params.IsActive,
-			},
-		}); err != nil {
+		if err = b.bannersRedisRepo.PutBannerRedis(ctx, &banners_repository.PutRedisBanner{}); err != nil {
 			return err
 		}
 
-		bannerId = id
+		bannerId = insertParams.BannerId
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
 
 	return bannerId, nil

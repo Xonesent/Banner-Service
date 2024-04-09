@@ -1,4 +1,4 @@
-package banners_postgres
+package sql_queries
 
 const (
 	BannersTableName      = "banner_schema.banners"
@@ -17,9 +17,13 @@ const (
 
 var (
 	GetBannerColumns = []string{
+		BannerIdColumnName,
 		TitleColumnName,
 		TextColumnName,
 		UrlColumnName,
+		FeatureIdColumnName,
+		CreatedAtColumnName,
+		UpdatedAtColumnName,
 		IsActiveColumnName,
 	}
 	SelectBannerColumns = []string{
@@ -37,9 +41,9 @@ var (
 		TextColumnName,
 		UrlColumnName,
 		FeatureIdColumnName,
-		IsActiveColumnName,
 		CreatedAtColumnName,
 		UpdatedAtColumnName,
+		IsActiveColumnName,
 	}
 	InsertTagColumns = []string{
 		BannerIdColumnName,

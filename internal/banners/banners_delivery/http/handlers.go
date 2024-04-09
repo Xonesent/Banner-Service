@@ -2,19 +2,18 @@ package banners_http
 
 import (
 	"avito/assignment/config"
-	"avito/assignment/internal/banners"
-	"avito/assignment/internal/models/banner_models"
 	"avito/assignment/pkg/traces"
 	reqvalidator "avito/assignment/pkg/validator"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 )
 
 type BannersHandlers struct {
-	bannersUC banners.Usecase
+	bannersUC BannersUseCase
 	cfg       *config.Config
 }
 
-func NewUserHandler(bannersUC banners.Usecase, cfg *config.Config) *BannersHandlers {
+func NewUserHandler(bannersUC BannersUseCase, cfg *config.Config) *BannersHandlers {
 	return &BannersHandlers{
 		bannersUC: bannersUC,
 		cfg:       cfg,
@@ -28,27 +27,20 @@ func (b *BannersHandlers) GetBanner() fiber.Handler {
 
 		token := c.Locals("token").(string)
 
-		params := banner_models.GetBanner{}
-		if err := reqvalidator.ReadRequest(c, &params); err != nil {
-			return traces.SpanSetErrWrapf(
-				span,
-				fiber.ErrBadRequest,
-				"BannersHandlers.GetBanner.ReadRequest(args:%v)",
-				params,
-			)
+		getBanner := GetBannerRequest{}
+		if err := reqvalidator.ReadRequest(c, &getBanner); err != nil {
+			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = %s", err.Error()))
 		}
-		params.AuthToken = token
 
-		bannerInfo, err := b.bannersUC.GetBanner(ctx, params)
+		getBannerDTO := getBanner.ToGetBanner()
+		getBannerDTO.AuthToken = token
+
+		bannerInfo, err := b.bannersUC.GetBanner(ctx, getBannerDTO)
 		if err != nil {
 			return err
 		}
 
-		return c.JSON(fiber.Map{
-			"title": bannerInfo.Title,
-			"text":  bannerInfo.Text,
-			"url":   bannerInfo.Url,
-		})
+		return c.JSON(bannerInfo)
 	}
 }
 
@@ -57,17 +49,14 @@ func (b *BannersHandlers) GetManyBanner() fiber.Handler {
 		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetBanner")
 		defer span.End()
 
-		params := banner_models.GetManyBanner{}
-		if err := reqvalidator.ReadRequest(c, &params); err != nil {
-			return traces.SpanSetErrWrapf(
-				span,
-				fiber.ErrBadRequest,
-				"BannersHandlers.GetBanner.ReadRequest(args:%v)",
-				params,
-			)
+		getManyBanner := GetManyBannerRequest{}
+		if err := reqvalidator.ReadRequest(c, &getManyBanner); err != nil {
+			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = %s", err.Error()))
 		}
 
-		manyBannerInfo, err := b.bannersUC.GetManyBanner(ctx, params)
+		getManyBannerDTO := getManyBanner.ToGetManyBanner()
+
+		manyBannerInfo, err := b.bannersUC.GetManyBanner(ctx, getManyBannerDTO)
 		if err != nil {
 			return err
 		}
@@ -81,21 +70,19 @@ func (b *BannersHandlers) AddBanner() fiber.Handler {
 		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetBanner")
 		defer span.End()
 
-		params := banner_models.AddBanner{}
-		if err := reqvalidator.ReadRequest(c, &params); err != nil {
-			return traces.SpanSetErrWrapf(
-				span,
-				fiber.ErrBadRequest,
-				"BannersHandlers.GetBanner.ReadRequest(args:%v)",
-				params,
-			)
+		addBanner := AddBannerRequest{}
+		if err := reqvalidator.ReadRequest(c, &addBanner); err != nil {
+			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = %s", err.Error()))
 		}
 
-		bannerId, err := b.bannersUC.AddBanner(ctx, params)
+		addBannerDTO := addBanner.ToAddBanner()
+
+		bannerId, err := b.bannersUC.AddBanner(ctx, addBannerDTO)
 		if err != nil {
 			return err
 		}
 
+		c.Status(fiber.StatusCreated)
 		return c.JSON(fiber.Map{
 			"banner_id": bannerId,
 		})

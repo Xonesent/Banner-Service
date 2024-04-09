@@ -1,13 +1,12 @@
 package banners_http
 
 import (
-	"avito/assignment/internal/banners"
 	"avito/assignment/internal/middleware"
 	"avito/assignment/pkg/constant"
 	"github.com/gofiber/fiber/v2"
 )
 
-func MapBannersRoutes(group fiber.Router, h banners.Handlers, mw *middleware.MDWManager) {
+func MapBannersRoutes(group fiber.Router, h Handlers, mw *middleware.MDWManager) {
 	group.Get("/user_banner", mw.CheckAuthToken(constant.AllRoles), h.GetBanner())
 	group.Get("/banner", mw.CheckAuthToken(constant.AdminRoles), h.GetManyBanner())
 	group.Post("/banner", mw.CheckAuthToken(constant.AdminRoles), h.AddBanner())

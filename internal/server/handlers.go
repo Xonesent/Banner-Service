@@ -2,8 +2,7 @@ package server
 
 import (
 	banners_http "avito/assignment/internal/banners/banners_delivery/http"
-	banners_postgres "avito/assignment/internal/banners/banners_repository/postgres"
-	banners_redis "avito/assignment/internal/banners/banners_repository/redis"
+	banners_postgres "avito/assignment/internal/banners/banners_repository"
 	"avito/assignment/internal/banners/banners_usecase"
 	"avito/assignment/internal/middleware"
 	trmsqlx "github.com/avito-tech/go-transaction-manager/sqlx"
@@ -12,7 +11,7 @@ import (
 
 func (s *Server) MapHandlers() (err error) {
 	bannersPGRepo := banners_postgres.NewBannerRepository(s.cfg, s.pgDB, trmsqlx.DefaultCtxGetter)
-	bannersRedisRepo := banners_redis.NewClientRedisRepository(s.redis, s.cfg)
+	bannersRedisRepo := banners_postgres.NewClientRedisRepository(s.redis, s.cfg)
 	trManager := manager.Must(trmsqlx.NewDefaultFactory(s.pgDB))
 
 	bannersUC := banners_usecase.NewBannersUC(s.cfg, trManager, bannersPGRepo, bannersRedisRepo)
