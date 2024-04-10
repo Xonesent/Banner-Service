@@ -11,11 +11,10 @@ type GetPostgresBanner struct {
 }
 
 type GetManyPostgresBanner struct {
-	TagId             *models.TagId
-	FeatureId         *models.FeatureId
-	PossibleBannerIds []models.BannerId
-	Limit             *int
-	Offset            *int
+	TagId     *models.TagId
+	FeatureId *models.FeatureId
+	Limit     *int
+	Offset    *int
 }
 
 type AddPostgresBanner struct {
@@ -33,12 +32,17 @@ type GetInsertParams struct {
 }
 
 type CheckExistBanner struct {
-	TagId     models.TagId
+	TagId     []models.TagId
 	FeatureId models.FeatureId
 }
 
+type ExistBanner struct {
+	TagId     models.TagId     `db:"tag_id"`
+	FeatureId models.FeatureId `db:"feature_id"`
+}
+
 type AddTagsPostgres struct {
-	TagId    models.TagId
+	TagId    []models.TagId
 	BannerId models.BannerId
 }
 

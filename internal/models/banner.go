@@ -44,3 +44,18 @@ func (b *Banner) ToFullBanner(tagIds []TagId) *FullBanner {
 		UpdatedAt: b.UpdatedAt,
 	}
 }
+
+func (b *Banner) ToFullBannerWithoutTagIds() *FullBanner {
+	return &FullBanner{
+		BannerId:  b.BannerId,
+		FeatureId: b.FeatureId,
+		Content: struct {
+			Title string
+			Text  string
+			Url   string
+		}{Title: b.Title, Text: b.Text, Url: b.Url},
+		IsActive:  b.IsActive,
+		CreatedAt: b.CreatedAt,
+		UpdatedAt: b.UpdatedAt,
+	}
+}

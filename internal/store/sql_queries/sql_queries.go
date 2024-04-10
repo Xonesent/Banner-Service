@@ -16,6 +16,10 @@ const (
 )
 
 var (
+	GetManyPossibleTagIds = []string{
+		BannerIdColumnName,
+		TagIdColumnName,
+	}
 	GetBannerColumnsWithInnerJoin = []string{
 		"b.banner_id",
 		TitleColumnName,

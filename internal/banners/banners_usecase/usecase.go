@@ -84,27 +84,24 @@ func (b *BannersUC) GetManyBanner(ctx context.Context, getManyBannerParams *GetM
 
 	manyBannerInfo := &[]models.FullBanner{}
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		var possibleBannerIds []models.BannerId
-		if getManyBannerParams.TagId != nil {
-			bannerIds, err := b.bannersPGRepo.GetPossibleBannerIds(ctx, *getManyBannerParams.TagId)
-			if err != nil {
-				return err
-			}
-			possibleBannerIds = bannerIds
-		}
-
-		manyBanner, err := b.bannersPGRepo.GetManyBannerPostgres(ctx, getManyBannerParams.ToGetManyPostgresBanner(possibleBannerIds))
+		//TODO объединить запросы getManyBanner + getTagIds
+		manyBanner, err := b.bannersPGRepo.GetManyBannerPostgres(ctx, getManyBannerParams.ToGetManyPostgresBanner())
 		if err != nil {
 			return err
 		}
 
+		if *manyBanner == nil {
+			return nil
+		}
+
+		var bannerIds []models.BannerId
 		for _, banner := range *manyBanner {
-			//TODO Оптимизировать добавление тэгайдишников
-			tagIds, err := b.bannersPGRepo.GetPossibleTagIds(ctx, banner.BannerId)
-			if err != nil {
-				return err
-			}
-			*manyBannerInfo = append(*manyBannerInfo, *banner.ToFullBanner(tagIds))
+			bannerIds = append(bannerIds, banner.BannerId)
+		}
+
+		manyBannerInfo, err = b.bannersPGRepo.GetManyPossibleTagIds(ctx, bannerIds, manyBanner)
+		if err != nil {
+			return err
 		}
 
 		return nil
@@ -122,15 +119,13 @@ func (b *BannersUC) AddBanner(ctx context.Context, addBannerParams *AddBanner) (
 
 	var bannerId models.BannerId
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		//TODO обдумать более быструю логику добавления баннера = На текущий момент мы
-		// 1) Проверяем можем ли мы добавить баннер (постоянный innerjoin и цикл)
-		// 2) Добавляем баннер
-		// 3) Добавляем тэгайдишники в баннер (по циклу)
-		for _, tagId := range addBannerParams.TagIds {
-			err := b.bannersPGRepo.CheckExist(ctx, &banners_repository.CheckExistBanner{TagId: tagId, FeatureId: addBannerParams.FeatureId})
-			if err != nil {
-				return err
-			}
+		existBanners, err := b.bannersPGRepo.CheckExist(ctx, &banners_repository.CheckExistBanner{TagId: addBannerParams.TagIds, FeatureId: addBannerParams.FeatureId})
+		if err != nil {
+			return err
+		}
+
+		if len(*existBanners) != 0 {
+			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("BannersUC.GetBanner.NotAdminRedis; err = these banners already exists %v", *existBanners))
 		}
 
 		insertParams, err := b.bannersPGRepo.AddBannerPostgres(ctx, addBannerParams.ToAddBannerPostgres())
@@ -138,14 +133,8 @@ func (b *BannersUC) AddBanner(ctx context.Context, addBannerParams *AddBanner) (
 			return err
 		}
 
-		for _, tagId := range addBannerParams.TagIds {
-			err = b.bannersPGRepo.AddTags(ctx, &banners_repository.AddTagsPostgres{TagId: tagId, BannerId: insertParams.BannerId})
-			if err != nil {
-				return err
-			}
-		}
-
-		if err = b.bannersRedisRepo.PutBannerRedis(ctx, &banners_repository.PutRedisBanner{}); err != nil {
+		err = b.bannersPGRepo.AddTags(ctx, &banners_repository.AddTagsPostgres{TagId: addBannerParams.TagIds, BannerId: insertParams.BannerId})
+		if err != nil {
 			return err
 		}
 

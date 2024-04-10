@@ -74,6 +74,9 @@ func (b *BannersHandlers) AddBanner() fiber.Handler {
 		if err := reqvalidator.ReadRequest(c, &addBanner); err != nil {
 			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = %s", err.Error()))
 		}
+		if len(addBanner.TagIds) == 0 {
+			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = NilTagIds"))
+		}
 
 		addBannerDTO := addBanner.ToAddBanner()
 

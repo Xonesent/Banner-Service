@@ -26,13 +26,12 @@ type GetManyBanner struct {
 	Offset    *int
 }
 
-func (b *GetManyBanner) ToGetManyPostgresBanner(possibleBannerIds []models.BannerId) *banners_repository.GetManyPostgresBanner {
+func (b *GetManyBanner) ToGetManyPostgresBanner() *banners_repository.GetManyPostgresBanner {
 	return &banners_repository.GetManyPostgresBanner{
-		TagId:             b.TagId,
-		FeatureId:         b.FeatureId,
-		PossibleBannerIds: possibleBannerIds,
-		Limit:             b.Limit,
-		Offset:            b.Offset,
+		TagId:     b.TagId,
+		FeatureId: b.FeatureId,
+		Limit:     b.Limit,
+		Offset:    b.Offset,
 	}
 }
 
