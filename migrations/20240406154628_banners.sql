@@ -20,6 +20,9 @@ CREATE TABLE banner_schema.banners_X_tags(
     FOREIGN KEY (banner_id) REFERENCES banner_schema.banners(banner_id)
 );
 
+CREATE INDEX idx_banner_id_banners ON banner_schema.banners(banner_id);
+CREATE INDEX idx_banner_id_banners_X_tags ON banner_schema.banners_X_tags(banner_id);
+
 -- +goose StatementEnd
 
 -- +goose Down

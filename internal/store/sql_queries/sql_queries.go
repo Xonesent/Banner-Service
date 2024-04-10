@@ -16,6 +16,16 @@ const (
 )
 
 var (
+	GetBannerColumnsWithInnerJoin = []string{
+		"b.banner_id",
+		TitleColumnName,
+		TextColumnName,
+		UrlColumnName,
+		FeatureIdColumnName,
+		CreatedAtColumnName,
+		UpdatedAtColumnName,
+		IsActiveColumnName,
+	}
 	GetBannerColumns = []string{
 		BannerIdColumnName,
 		TitleColumnName,

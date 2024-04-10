@@ -78,16 +78,17 @@ func (b *BannersRepo) GetPossibleTagIds(ctx context.Context, bannerId models.Ban
 	return tagIds, nil
 }
 
-func (b *BannersRepo) GetBannerPostgres(ctx context.Context, getPostgresBannerParams *GetPostgresBanner) (*models.Banner, error) {
+func (b *BannersRepo) GetBannerPostgres(ctx context.Context, getPostgresqlBannerParams *GetPostgresBanner) (*models.Banner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.GetBannerPostgres")
 	defer span.End()
 
-	query, args, err := sq.Select(sql_queries.GetBannerColumns...).
-		From(sql_queries.BannersTableName).
+	query, args, err := sq.Select(sql_queries.GetBannerColumnsWithInnerJoin...).
+		From(fmt.Sprintf("%s b", sql_queries.BannersTableName)).
+		InnerJoin(fmt.Sprintf("%s bxt ON bxt.banner_id = b.banner_id", sql_queries.BannersXTagsTableName)).
 		Where(
 			sq.And{
-				sq.Eq{sql_queries.BannerIdColumnName: getPostgresBannerParams.PossibleBannerIds},
-				sq.Eq{sql_queries.FeatureIdColumnName: getPostgresBannerParams.FeatureId},
+				sq.Eq{sql_queries.TagIdColumnName: getPostgresqlBannerParams.TagId},
+				sq.Eq{sql_queries.FeatureIdColumnName: getPostgresqlBannerParams.FeatureId},
 			},
 		).
 		PlaceholderFormat(sq.Dollar).

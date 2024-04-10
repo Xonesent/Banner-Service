@@ -6,8 +6,8 @@ import (
 )
 
 type GetPostgresBanner struct {
-	FeatureId         models.FeatureId
-	PossibleBannerIds []models.BannerId
+	FeatureId models.FeatureId
+	TagId     models.TagId
 }
 
 type GetManyPostgresBanner struct {

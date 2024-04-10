@@ -40,7 +40,7 @@ func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (
 		}
 		if fullBanner != nil {
 			if fullBanner.IsActive == false && getBannerParams.AuthToken == constant.UserToken {
-				return nil, fiber.NewError(fiber.ErrNotFound.Code, fmt.Sprintf("BannersUC.GetBanner.NotAdmin; err = %s", err.Error()))
+				return nil, fiber.NewError(fiber.ErrNotFound.Code, fmt.Sprintf("BannersUC.GetBanner.NotAdminRedis; err = %s", err.Error()))
 			}
 			return fullBanner, nil
 		}
@@ -48,13 +48,9 @@ func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (
 
 	fullBanner := &models.FullBanner{}
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		possibleBannerIds, err := b.bannersPGRepo.GetPossibleBannerIds(ctx, getBannerParams.TagId)
-		if err != nil {
-			return err
-		}
 		banner, err := b.bannersPGRepo.GetBannerPostgres(ctx, &banners_repository.GetPostgresBanner{
-			FeatureId:         getBannerParams.FeatureId,
-			PossibleBannerIds: possibleBannerIds,
+			FeatureId: getBannerParams.FeatureId,
+			TagId:     getBannerParams.TagId,
 		})
 		if err != nil {
 			return err
@@ -77,7 +73,7 @@ func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (
 	}
 
 	if fullBanner.IsActive == false && getBannerParams.AuthToken == constant.UserToken {
-		return nil, fiber.NewError(fiber.StatusNotFound, fmt.Sprintf("ClientRedisRepo.GetBannerRedis.Get; err = %s", err.Error()))
+		return nil, fiber.NewError(fiber.StatusNotFound, fmt.Sprintf("BannersUC.GetBanner.NotAdminPostgres; err = %s", err.Error()))
 	}
 	return fullBanner, nil
 }
