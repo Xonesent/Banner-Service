@@ -3,9 +3,9 @@ package banners_http
 import (
 	"avito/assignment/config"
 	"avito/assignment/internal/models"
+	"avito/assignment/pkg/errlst"
 	"avito/assignment/pkg/traces"
 	reqvalidator "avito/assignment/pkg/validator"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"strconv"
 )
@@ -31,7 +31,7 @@ func (b *BannersHandlers) GetBanner() fiber.Handler {
 
 		getBanner := GetBannerRequest{}
 		if err := reqvalidator.ReadRequest(c, &getBanner); err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, err, "BannersHandlers.GetBanner.ReadRequest")
 		}
 
 		getBannerDTO := getBanner.ToGetBanner()
@@ -48,12 +48,12 @@ func (b *BannersHandlers) GetBanner() fiber.Handler {
 
 func (b *BannersHandlers) GetManyBanner() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetBanner")
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetManyBanner")
 		defer span.End()
 
 		getManyBanner := GetManyBannerRequest{}
 		if err := reqvalidator.ReadRequest(c, &getManyBanner); err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, err, "BannersHandlers.GetManyBanner.ReadRequest")
 		}
 
 		getManyBannerDTO := getManyBanner.ToGetManyBanner()
@@ -69,15 +69,15 @@ func (b *BannersHandlers) GetManyBanner() fiber.Handler {
 
 func (b *BannersHandlers) AddBanner() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.GetBanner")
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.AddBanner")
 		defer span.End()
 
 		addBanner := AddBannerRequest{}
 		if err := reqvalidator.ReadRequest(c, &addBanner); err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, err, "BannersHandlers.GetManyBanner.ReadRequest")
 		}
 		if len(addBanner.TagIds) == 0 {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.GetBanner.ReadRequest; err = NilTagIds"))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.GetManyBanner.NilTagIds")
 		}
 
 		addBannerDTO := addBanner.ToAddBanner()
@@ -101,11 +101,11 @@ func (b *BannersHandlers) PatchBanner() fiber.Handler {
 
 		patchBanner := PatchBannerRequest{}
 		if err := reqvalidator.ReadRequest(c, &patchBanner); err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.ReadRequest; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.PatchBanner.ReadRequest")
 		}
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.PatchBanner.NilBannerParams")
 		}
 
 		patchBannerDTO := patchBanner.ToPatchBanner(models.BannerId(bannerId))
@@ -123,12 +123,12 @@ func (b *BannersHandlers) PatchBanner() fiber.Handler {
 
 func (b *BannersHandlers) DeleteBanner() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.PatchBanner")
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.DeleteBanner")
 		defer span.End()
 
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.DeleteBanner.NilBannerParams")
 		}
 
 		err = b.bannersUC.DeleteBanner(ctx, models.BannerId(bannerId))
@@ -145,12 +145,12 @@ func (b *BannersHandlers) DeleteBanner() fiber.Handler {
 
 func (b *BannersHandlers) ViewVersions() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.PatchBanner")
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.ViewVersions")
 		defer span.End()
 
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.NilBannerParams")
 		}
 
 		banners, err := b.bannersUC.ViewVersions(ctx, models.BannerId(bannerId))
@@ -169,11 +169,11 @@ func (b *BannersHandlers) BannerRollback() fiber.Handler {
 
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.NilBannerParams")
 		}
 		version, err := strconv.Atoi(c.Params("version"))
 		if err != nil {
-			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.NilVersionParams")
 		}
 
 		err = b.bannersUC.BannerRollback(ctx, models.BannerId(bannerId), int64(version))

@@ -57,22 +57,6 @@ func (b *AddBanner) ToAddBannerPostgres() *banners_repository.AddPostgresBanner 
 	}
 }
 
-//func (b *AddBanner) ToPutRedisBanner(getInsertParams *banners_repository.GetInsertParams) *banners_repository.PutRedisBanner {
-//	return &banners_repository.PutRedisBanner{
-//		BannerId:  getInsertParams.BannerId,
-//		TagIds:    b.TagIds,
-//		FeatureId: b.FeatureId,
-//		Content: struct {
-//			Title string
-//			Text  string
-//			Url   string
-//		}{Title: b.Content.Title, Text: b.Content.Text, Url: b.Content.Url},
-//		IsActive:  b.IsActive,
-//		CreatedAt: getInsertParams.CreatedAt,
-//		UpdatedAt: getInsertParams.UpdatedAt,
-//	}
-//}
-
 func ToPutRedisBanner(fullBanner *models.FullBanner) *banners_repository.PutRedisBanner {
 	return &banners_repository.PutRedisBanner{
 		BannerId:  fullBanner.BannerId,

@@ -53,12 +53,12 @@ func StartFiberTrace(c *fiber.Ctx, spanName string) (context.Context, trace.Span
 	return ctx, span
 }
 
-func SpanSetErrWrapf(span trace.Span, err error, template string, args ...interface{}) error {
+func SpanSetErrWrap(span trace.Span, err, errorValue error, errorPlace string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	template = fmt.Sprintf("%s; traceID: %s", template, span.SpanContext().TraceID().String())
-	err = errors.Wrapf(err, template, args...)
+	errorInfo := fmt.Sprintf("%s|%s|%v|", errorPlace, errorValue, args)
+	err = errors.Wrapf(err, errorInfo)
 	span.SetStatus(codes.Error, err.Error())
 	return err
 }

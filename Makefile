@@ -1,9 +1,11 @@
-
 first_build:
 	make init_postgres
 	make init_redis
 	make init_jaeger
 	make migration-up
+
+run:
+	go run .\cmd\main.go
 
 init_postgres:
 	docker run --name postgres_avito -e POSTGRES_PASSWORD='test' -e POSTGRES_DB='avito' -e POSTGRES_USER='postgres'  -d -p 54325:5432 postgres

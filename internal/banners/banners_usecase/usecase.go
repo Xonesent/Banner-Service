@@ -5,6 +5,8 @@ import (
 	"avito/assignment/internal/banners/banners_repository"
 	"avito/assignment/internal/models"
 	"avito/assignment/pkg/constant"
+	"avito/assignment/pkg/errlst"
+	"avito/assignment/pkg/traces"
 	"avito/assignment/pkg/utilities"
 	"context"
 	"errors"
@@ -30,6 +32,9 @@ func NewBannersUC(cfg *config.Config, trManager *manager.Manager, bannersRepo Po
 	}
 }
 
+// GetBanner (берем случай с use_last_version = false, так как он сложнее)
+// 1. Запрашиваем редис отдать запись, если удается - то сразе ее возвращаем
+// 2. Если нам не удалось ее получить, то берем ее из постгреса и кладем в редис
 func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (*models.FullBanner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetBanner")
 	defer span.End()
@@ -41,7 +46,7 @@ func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (
 		}
 		if fullBanner != nil {
 			if fullBanner.IsActive == false && getBannerParams.AuthToken == constant.UserToken {
-				return nil, fiber.NewError(fiber.ErrNotFound.Code, fmt.Sprintf("BannersUC.GetBanner.NotAdminRedis; err = %s", err.Error()))
+				return nil, traces.SpanSetErrWrap(span, errlst.HttpErrNotFound, nil, "BannersUC.GetBanner.NotAdmin")
 			}
 			return fullBanner, nil
 		}
@@ -49,10 +54,7 @@ func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (
 
 	fullBanner := &models.FullBanner{}
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		banner, err := b.bannersPGRepo.GetBannerPostgres(ctx, &banners_repository.GetPostgresBanner{
-			FeatureId: getBannerParams.FeatureId,
-			TagId:     getBannerParams.TagId,
-		})
+		banner, err := b.bannersPGRepo.GetBanner(ctx, getBannerParams.FeatureId, getBannerParams.TagId)
 		if err != nil {
 			return err
 		}
@@ -74,18 +76,21 @@ func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (
 	}
 
 	if fullBanner.IsActive == false && getBannerParams.AuthToken == constant.UserToken {
-		return nil, fiber.NewError(fiber.StatusNotFound, fmt.Sprintf("BannersUC.GetBanner.NotAdminPostgres; err = %s", err.Error()))
+		return nil, traces.SpanSetErrWrap(span, errlst.HttpErrNotFound, nil, "BannersUC.GetBanner.NotAdmin")
 	}
 	return fullBanner, nil
 }
 
+// GetManyBanner
+// 1. Просим из постгреса все записи из бд с баннерами соответствующие требованиям
+// 2. Добавляем к каждой записи тэг айдишники из бд с тэгайдишниками
 func (b *BannersUC) GetManyBanner(ctx context.Context, getManyBannerParams *GetManyBanner) (*[]models.FullBanner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetManyBanner")
 	defer span.End()
 
 	manyBannerInfo := &[]models.FullBanner{}
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		manyBanner, err := b.bannersPGRepo.GetManyBannerPostgres(ctx, getManyBannerParams.ToGetManyPostgresBanner())
+		manyBanner, err := b.bannersPGRepo.GetManyBanner(ctx, getManyBannerParams.ToGetManyPostgresBanner())
 		if err != nil {
 			return err
 		}
@@ -113,27 +118,32 @@ func (b *BannersUC) GetManyBanner(ctx context.Context, getManyBannerParams *GetM
 	return manyBannerInfo, nil
 }
 
+// AddBanner
+// 1. Проверяем существует ли уже запись в бд с соответствующими фич тэг айдишниками
+// 2. Добавляем запись в бд с баннерами
+// 3. Добавляем записи в бд с тэгами
 func (b *BannersUC) AddBanner(ctx context.Context, addBannerParams *AddBanner) (models.BannerId, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetManyBanner")
 	defer span.End()
 
 	var bannerId models.BannerId
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
-		existBanners, err := b.bannersPGRepo.CheckExist(ctx, &banners_repository.CheckExistBanner{TagId: addBannerParams.TagIds, FeatureId: addBannerParams.FeatureId})
+		existBanners, err := b.bannersPGRepo.CheckExist(ctx, addBannerParams.TagIds, addBannerParams.FeatureId)
 		if err != nil {
 			return err
 		}
 
 		if len(*existBanners) != 0 {
-			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("BannersUC.GetBanner.NotAdminRedis; err = these banners already exists %v", *existBanners))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest,
+				errors.New(fmt.Sprintf("these banners already exists %v", *existBanners)), "BannersUC.AddBanner.AlreadyExists")
 		}
 
-		insertParams, err := b.bannersPGRepo.AddBannerPostgres(ctx, addBannerParams.ToAddBannerPostgres())
+		insertParams, err := b.bannersPGRepo.AddBanner(ctx, addBannerParams.ToAddBannerPostgres())
 		if err != nil {
 			return err
 		}
 
-		err = b.bannersPGRepo.AddTags(ctx, &banners_repository.AddTagsPostgres{TagIds: addBannerParams.TagIds, BannerId: insertParams.BannerId})
+		err = b.bannersPGRepo.AddTags(ctx, addBannerParams.TagIds, insertParams.BannerId)
 		if err != nil {
 			return err
 		}
@@ -148,6 +158,14 @@ func (b *BannersUC) AddBanner(ctx context.Context, addBannerParams *AddBanner) (
 	return bannerId, nil
 }
 
+// PatchBanner Нечитабельный мусор, в readme добавлю че произошло
+// 1. Проверяем существует ли баннер, который надо обновить
+// 2. Проверяем способны ли мы добавить в бд запись
+// 3. Проверяем обновляем ли мы хоть что то в существующей записи
+// 4. Обновляю баннер
+// 5. Удаляю + добавляю тэги, чтобы они соответствовали запросу
+// 6. Добавляю версию в бд с версиями
+// 7. Удаляю пятую версию баннера в бд, в readme будет дискуссия на эту тему
 func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBanner) error {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.PatchBanner")
 	defer span.End()
@@ -158,7 +176,8 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 			return err
 		}
 		if prevBanner.BannerId == 0 {
-			return errors.New(fmt.Sprintf("impossible to update, banner with id %d doesnt exist", patchBannerParams.BannerId))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrNotFound,
+				errors.New(fmt.Sprintf("impossible to update, banner with id %d doesnt exist", patchBannerParams.BannerId)), "BannersUC.PatchBanner.ErrNotFound")
 		}
 
 		var addTags []models.TagId
@@ -168,19 +187,19 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 		}
 		if patchBannerParams.FeatureId != nil && *patchBannerParams.FeatureId != prevBanner.FeatureId {
 			if patchBannerParams.TagIds != nil {
-				existBanners, err = b.bannersPGRepo.CheckExist(ctx, &banners_repository.CheckExistBanner{TagId: *patchBannerParams.TagIds, FeatureId: *patchBannerParams.FeatureId})
+				existBanners, err = b.bannersPGRepo.CheckExist(ctx, *patchBannerParams.TagIds, *patchBannerParams.FeatureId)
 				if err != nil {
 					return err
 				}
 			} else {
-				existBanners, err = b.bannersPGRepo.CheckExist(ctx, &banners_repository.CheckExistBanner{TagId: prevBanner.TagIds, FeatureId: *patchBannerParams.FeatureId})
+				existBanners, err = b.bannersPGRepo.CheckExist(ctx, prevBanner.TagIds, *patchBannerParams.FeatureId)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
 			if patchBannerParams.TagIds != nil {
-				existBanners, err = b.bannersPGRepo.CheckExist(ctx, &banners_repository.CheckExistBanner{TagId: addTags, FeatureId: *patchBannerParams.FeatureId})
+				existBanners, err = b.bannersPGRepo.CheckExist(ctx, addTags, *patchBannerParams.FeatureId)
 				if err != nil {
 					return err
 				}
@@ -190,11 +209,13 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 		}
 
 		if len(*existBanners) != 0 {
-			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("BannersUC.GetBanner.NotAdminRedis; err = these banners already exists %v", *existBanners))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest,
+				errors.New(fmt.Sprintf("these banners already exists {tag_id feature_id} %v", *existBanners)), "BannersUC.PatchBanner.AlreadyExists")
 		}
 
 		if patchBannerParams.Check(prevBanner) {
-			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("BannersUC.GetBanner.PatchBanner; err = NilSetClause"))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest,
+				errors.New(fmt.Sprintf("nothing to update")), "BannersUC.PatchBanner.NothingToUpdate")
 		}
 
 		err = b.bannersPGRepo.UpdateBannerById(ctx, patchBannerParams.ToPatchBanner(prevBanner.Version))
@@ -203,14 +224,14 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 		}
 		if patchBannerParams.TagIds != nil {
 			if len(addTags) != 0 {
-				err = b.bannersPGRepo.AddTags(ctx, &banners_repository.AddTagsPostgres{TagIds: addTags, BannerId: prevBanner.BannerId})
+				err = b.bannersPGRepo.AddTags(ctx, addTags, prevBanner.BannerId)
 				if err != nil {
 					return err
 				}
 			}
 			deleteTags := utilities.FindUniqueElements(prevBanner.TagIds, *patchBannerParams.TagIds)
 			if len(deleteTags) != 0 {
-				err = b.bannersPGRepo.DeleteTags(ctx, &banners_repository.DeleteTagsPostgres{TagIds: deleteTags, BannerId: prevBanner.BannerId})
+				err = b.bannersPGRepo.DeleteTags(ctx, deleteTags, prevBanner.BannerId)
 				if err != nil {
 					return err
 				}
@@ -222,7 +243,7 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 			return err
 		}
 
-		err = b.bannersPGRepo.DeleteVersion(ctx, &banners_repository.DeleteVersionPostgres{Version: []int64{prevBanner.Version - 3}, BannerId: patchBannerParams.BannerId})
+		err = b.bannersPGRepo.DeleteVersion(ctx, []int64{prevBanner.Version - 3}, patchBannerParams.BannerId)
 		if err != nil {
 			return err
 		}
@@ -236,8 +257,11 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 	return nil
 }
 
+// DeleteBanner
+// 1. Проверяю существует ли запись, которую я хочу удалить (в readme добавлю кое че по этому поводу)
+// 2. Удаляю версии, тэги и сам баннер
 func (b *BannersUC) DeleteBanner(ctx context.Context, bannerId models.BannerId) error {
-	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.PatchBanner")
+	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.DeleteBanner")
 	defer span.End()
 
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
@@ -246,14 +270,15 @@ func (b *BannersUC) DeleteBanner(ctx context.Context, bannerId models.BannerId) 
 			return err
 		}
 		if prevBanner.BannerId == 0 {
-			return errors.New(fmt.Sprintf("impossible to delete, banner with id %d doesnt exist", bannerId))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrNotFound,
+				errors.New(fmt.Sprintf("impossible to delete, banner with id %d doesnt exist", bannerId)), "BannersUC.DeleteBanner.DoNotExist")
 		}
 
-		err = b.bannersPGRepo.DeleteVersion(ctx, &banners_repository.DeleteVersionPostgres{Version: []int64{}, BannerId: bannerId})
+		err = b.bannersPGRepo.DeleteVersion(ctx, []int64{}, bannerId)
 		if err != nil {
 			return err
 		}
-		err = b.bannersPGRepo.DeleteTags(ctx, &banners_repository.DeleteTagsPostgres{TagIds: []models.TagId{}, BannerId: bannerId})
+		err = b.bannersPGRepo.DeleteTags(ctx, []models.TagId{}, bannerId)
 		if err != nil {
 			return err
 		}
@@ -276,8 +301,11 @@ func (b *BannersUC) DeleteBanner(ctx context.Context, bannerId models.BannerId) 
 	return nil
 }
 
+// ViewVersions
+// 1. Проверяем существует ли баннер, чьи версии мы хотим просмотреть
+// 2. Добавляем в слайс версий текущую версию и остальные
 func (b *BannersUC) ViewVersions(ctx context.Context, bannerId models.BannerId) (*[]models.FullBanner, error) {
-	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.PatchBanner")
+	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.ViewVersions")
 	defer span.End()
 
 	var fullBanners []models.FullBanner
@@ -288,7 +316,8 @@ func (b *BannersUC) ViewVersions(ctx context.Context, bannerId models.BannerId) 
 		}
 
 		if banner == nil {
-			return errors.New(fmt.Sprintf("impossible to view, banner with id %d doesnt exist", bannerId))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrNotFound,
+				errors.New(fmt.Sprintf("impossible to delete, banner with id %d doesnt exist", bannerId)), "BannersUC.ViewVersions.DoNotExist")
 		}
 		fullBanners = append(fullBanners, *banner)
 
@@ -307,8 +336,11 @@ func (b *BannersUC) ViewVersions(ctx context.Context, bannerId models.BannerId) 
 	return &fullBanners, nil
 }
 
+// BannerRollback
+// 1. Проверяем существут ли баннер под таким айди и с такой версией
+// 2. Закидываем баннер в ручку patch
 func (b *BannersUC) BannerRollback(ctx context.Context, bannerId models.BannerId, version int64) error {
-	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.PatchBanner")
+	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.BannerRollback")
 	defer span.End()
 
 	err := b.trManager.Do(ctx, func(ctx context.Context) error {
@@ -318,7 +350,8 @@ func (b *BannersUC) BannerRollback(ctx context.Context, bannerId models.BannerId
 		}
 
 		if len(*banner) == 0 {
-			return errors.New(fmt.Sprintf("impossible to rollback, banner with id %d and version %d doesnt exist", bannerId, version))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrNotFound,
+				errors.New(fmt.Sprintf("impossible to rollback, banner with id %d and version %d doesnt exist", bannerId, version)), "BannersUC.BannerRollback.DoNotExist")
 		}
 
 		err = b.PatchBanner(ctx, ToPatchBanner((*banner)[0]))

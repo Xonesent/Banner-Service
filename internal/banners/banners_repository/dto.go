@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-type GetPostgresBanner struct {
-	FeatureId models.FeatureId
-	TagId     models.TagId
-}
-
 type GetManyPostgresBanner struct {
 	TagId     *models.TagId
 	FeatureId *models.FeatureId
@@ -33,19 +28,9 @@ type GetInsertParams struct {
 	UpdatedAt time.Time
 }
 
-type CheckExistBanner struct {
-	TagId     []models.TagId
-	FeatureId models.FeatureId
-}
-
 type ExistBanner struct {
 	TagId     models.TagId     `db:"tag_id"`
 	FeatureId models.FeatureId `db:"feature_id"`
-}
-
-type AddTagsPostgres struct {
-	TagIds   []models.TagId
-	BannerId models.BannerId
 }
 
 type PutRedisBanner struct {
@@ -75,16 +60,6 @@ type UpdateBannerById struct {
 	IsActive  *bool
 	BannerId  models.BannerId
 	Version   int64
-}
-
-type DeleteTagsPostgres struct {
-	TagIds   []models.TagId
-	BannerId models.BannerId
-}
-
-type DeleteVersionPostgres struct {
-	Version  []int64
-	BannerId models.BannerId
 }
 
 type FullBanner struct {

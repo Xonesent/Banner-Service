@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"avito/assignment/config"
+	"avito/assignment/pkg/errlst"
 	"avito/assignment/pkg/traces"
 	"avito/assignment/pkg/utilities"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -23,9 +23,9 @@ func (m *MDWManager) CheckAuthToken(restrictions []string) fiber.Handler {
 
 		token := c.Get("token")
 		if token == "" {
-			return fiber.NewError(fiber.StatusUnauthorized, fmt.Sprintf("MDWManager.CheckAuthToken.NilToken"))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrUnauthorized, nil, "MDWManager.CheckAuthToken.NilToken")
 		} else if !utilities.InStringSlice(token, restrictions) {
-			return fiber.NewError(fiber.StatusForbidden, fmt.Sprintf("MDWManager.CheckAuthToken.Forbidden"))
+			return traces.SpanSetErrWrap(span, errlst.HttpErrForbidden, nil, "MDWManager.CheckAuthToken.Forbidden")
 		}
 
 		c.Locals("token", token)

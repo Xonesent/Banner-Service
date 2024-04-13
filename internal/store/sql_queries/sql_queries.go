@@ -1,11 +1,5 @@
 package sql_queries
 
-var (
-	UnionSqlQuery = "SELECT banner_id, title, text, url, feature_id, NULL AS tag_ids,  created_at, updated_at, is_active, version FROM banner_schema.banners " +
-		"UNION SELECT banner_id, title, text, url, feature_id, tag_ids, created_at, updated_at, is_active, version FROM banner_schema.banners_versions " +
-		"WHERE (banner_id = $1) ORDER BY (version) DESC;"
-)
-
 const (
 	BannersTableName         = "banner_schema.banners"
 	BannersXTagsTableName    = "banner_schema.banners_X_tags"

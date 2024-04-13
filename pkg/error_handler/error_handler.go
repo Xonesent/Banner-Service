@@ -6,6 +6,7 @@ import (
 	"avito/assignment/pkg/utilities"
 	"errors"
 	"github.com/gofiber/fiber/v2"
+	"strings"
 )
 
 func FiberErrorHandler(ctx *fiber.Ctx, err error) error {
@@ -14,11 +15,14 @@ func FiberErrorHandler(ctx *fiber.Ctx, err error) error {
 	if !ok {
 		traceId = "impossible to get traceId"
 	}
+	errorInfo := strings.Split(err.Error(), "|")
 	if utilities.InStringSlice(constant.Host, constant.DevHosts) {
 		return ctx.JSON(map[string]interface{}{
-			"error":    err.Error(),
-			"data":     nil,
-			"trace-id": traceId,
+			"data":        nil,
+			"trace-id":    traceId,
+			"error_place": errorInfo[0],
+			"error_value": errorInfo[1],
+			"error_args":  errorInfo[2],
 		})
 	}
 	return ctx.JSON(map[string]interface{}{
@@ -33,8 +37,6 @@ func setStatusCode(ctx *fiber.Ctx, err error) {
 	var e *fiber.Error
 	if errors.As(err, &e) {
 		statusCode = e.Code
-	} else {
-		statusCode = fiber.StatusInternalServerError
 	}
 	ctx.Status(statusCode)
 }
