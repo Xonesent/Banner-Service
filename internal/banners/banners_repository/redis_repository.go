@@ -69,6 +69,30 @@ func (r *ClientRedisRepo) GetBannerRedis(ctx context.Context, getRedisParams *Ge
 	return result, nil
 }
 
+func (r *ClientRedisRepo) DelBannerRedis(ctx context.Context, delRedisParams *GetRedisBanner) error {
+	ctx, span := otel.Tracer("").Start(ctx, "AdminRedisRepo.DelSession")
+	defer span.End()
+
+	regex := r.createDbKey(delRedisParams.TagId, delRedisParams.FeatureId)
+	keys := make([]string, 0, 10)
+
+	iter := r.db.Scan(ctx, 0, regex, 0).Iterator()
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+
+	if len(keys) == 0 {
+		return nil
+	}
+
+	_, err := r.db.Del(ctx, keys...).Result()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *ClientRedisRepo) createDbKey(tagId models.TagId, featureId models.FeatureId) string {
 	return strings.Join([]string{strconv.Itoa(int(tagId)), strconv.Itoa(int(featureId))}, ":")
 }

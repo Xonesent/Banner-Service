@@ -4,6 +4,7 @@ import (
 	"avito/assignment/internal/banners/banners_usecase"
 	"avito/assignment/internal/models"
 	"avito/assignment/pkg/utilities"
+	"time"
 )
 
 type GetBannerRequest struct {
@@ -101,4 +102,43 @@ func (b *PatchBannerRequest) ToPatchBanner(bannerId models.BannerId) *banners_us
 		IsActive:  b.IsActive,
 		BannerId:  bannerId,
 	}
+}
+
+type GetBannerResponse struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
+	Url   string `json:"url"`
+}
+
+func ToGetBannerResponse(b *models.FullBanner) *GetBannerResponse {
+	return &GetBannerResponse{
+		Title: b.Content.Title,
+		Text:  b.Content.Text,
+		Url:   b.Content.Url,
+	}
+}
+
+type GetManyBannerResponse struct {
+	BannerId  models.BannerId  `json:"banner_id"`
+	TagIds    []models.TagId   `json:"tag_ids"`
+	FeatureId models.FeatureId `json:"feature_id"`
+	Content   struct {
+		Title string `json:"title"`
+		Text  string `json:"text"`
+		Url   string `json:"url"`
+	} `json:"content"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Version   int64     `json:"version"`
+}
+
+func ToGetManyBannerResponse(b *[]models.FullBanner) *[]GetManyBannerResponse {
+	getManyBannerResponse := make([]GetManyBannerResponse, len(*b))
+
+	for i, value := range *b {
+		getManyBannerResponse[i] = GetManyBannerResponse(value)
+	}
+
+	return &getManyBannerResponse
 }

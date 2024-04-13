@@ -134,8 +134,11 @@ func (b *BannersRepo) GetManyBannerPostgres(ctx context.Context, getManyPostgres
 
 	queryBuilder := sqlBuilder.Where(conditions).
 		PlaceholderFormat(sq.Dollar).
-		OrderBy(sql_queries.BannerIdColumnName).
-		Offset(uint64(*getManyPostgresBannerParams.Offset))
+		OrderBy(sql_queries.BannerIdColumnName)
+
+	if getManyPostgresBannerParams.Offset != nil {
+		queryBuilder = queryBuilder.Offset(uint64(*getManyPostgresBannerParams.Offset))
+	}
 
 	if getManyPostgresBannerParams.Limit != nil && *getManyPostgresBannerParams.Limit != 0 {
 		queryBuilder = queryBuilder.Limit(uint64(*getManyPostgresBannerParams.Limit))
@@ -436,7 +439,7 @@ func (b *BannersRepo) DeleteTags(ctx context.Context, deleteTagsPostgresParams *
 	var conditions sq.And
 	conditions = append(conditions, sq.Eq{sql_queries.BannerIdColumnName: deleteTagsPostgresParams.BannerId})
 	if len(deleteTagsPostgresParams.TagIds) != 0 {
-		conditions = append(conditions, sq.Eq{sql_queries.VersionColumnName: deleteTagsPostgresParams.TagIds})
+		conditions = append(conditions, sq.Eq{sql_queries.TagIdColumnName: deleteTagsPostgresParams.TagIds})
 	}
 
 	query, args, err := sq.Delete(sql_queries.BannersXTagsTableName).
@@ -496,4 +499,41 @@ func (b *BannersRepo) DeleteBannerById(ctx context.Context, bannerId models.Bann
 	}
 
 	return nil
+}
+
+func (b *BannersRepo) GetBannerVersions(ctx context.Context, bannerId models.BannerId, versions []int64) (*[]models.FullBanner, error) {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.GetPossibleTagIds")
+	defer span.End()
+
+	sqlBuilder := sq.Select(sql_queries.SelectVersionColumns...).
+		From(sql_queries.BannersVersionsTableName)
+
+	conditions := sq.And{}
+	conditions = append(conditions, sq.Eq{sql_queries.BannerIdColumnName: bannerId})
+	if len(versions) != 0 {
+		conditions = append(conditions, sq.Eq{sql_queries.VersionColumnName: versions})
+	}
+
+	query, args, err := sqlBuilder.Where(conditions).
+		PlaceholderFormat(sq.Dollar).
+		OrderBy(fmt.Sprintf("%s DESC", sql_queries.VersionColumnName)).
+		ToSql()
+	if err != nil {
+		return nil, fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.GetPossibleTagIds.Select; err = %s", err.Error()))
+	}
+
+	var banners []FullBanner
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+	err = tr.SelectContext(ctx, &banners, query, args...)
+	if err != nil {
+		return nil, fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.GetPossibleTagIds.SelectContext; err = %s", err.Error()))
+	}
+
+	fullBanners := make([]models.FullBanner, len(banners))
+	for i := range banners {
+		fullBanners[i] = banners[i].ToFullBanners()
+	}
+
+	return &fullBanners, nil
 }

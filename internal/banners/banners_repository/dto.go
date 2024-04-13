@@ -2,6 +2,8 @@ package banners_repository
 
 import (
 	"avito/assignment/internal/models"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -83,4 +85,41 @@ type DeleteTagsPostgres struct {
 type DeleteVersionPostgres struct {
 	Version  []int64
 	BannerId models.BannerId
+}
+
+type FullBanner struct {
+	BannerId  models.BannerId  `db:"banner_id"`
+	TagIds    []uint8          `db:"tag_ids"`
+	FeatureId models.FeatureId `db:"feature_id"`
+	Title     string           `db:"title"`
+	Text      string           `db:"text"`
+	Url       string           `db:"url"`
+	IsActive  bool             `db:"is_active"`
+	CreatedAt time.Time        `db:"created_at"`
+	UpdatedAt time.Time        `db:"updated_at"`
+	Version   int64            `db:"version"`
+}
+
+func (b *FullBanner) ToFullBanners() models.FullBanner {
+	values := strings.Split(strings.Trim(string(b.TagIds), "{}"), ",")
+	var tagIds []models.TagId
+	for _, value := range values {
+		num, _ := strconv.ParseInt(value, 10, 64)
+		tagIds = append(tagIds, models.TagId(num))
+	}
+
+	return models.FullBanner{
+		BannerId:  b.BannerId,
+		TagIds:    tagIds,
+		FeatureId: b.FeatureId,
+		Content: struct {
+			Title string
+			Text  string
+			Url   string
+		}{Title: b.Title, Text: b.Text, Url: b.Url},
+		IsActive:  b.IsActive,
+		CreatedAt: b.CreatedAt,
+		UpdatedAt: b.UpdatedAt,
+		Version:   b.Version,
+	}
 }

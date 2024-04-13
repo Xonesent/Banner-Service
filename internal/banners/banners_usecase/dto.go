@@ -140,3 +140,15 @@ func (b *PatchBanner) Check(banner *models.FullBanner) bool {
 	}
 	return currCoincidence == maxCoincidence
 }
+
+func ToPatchBanner(banner models.FullBanner) *PatchBanner {
+	return &PatchBanner{
+		TagIds:    &banner.TagIds,
+		FeatureId: &banner.FeatureId,
+		Title:     &banner.Content.Title,
+		Text:      &banner.Content.Text,
+		Url:       &banner.Content.Url,
+		IsActive:  &banner.IsActive,
+		BannerId:  banner.BannerId,
+	}
+}

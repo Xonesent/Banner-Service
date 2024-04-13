@@ -12,4 +12,6 @@ func MapBannersRoutes(group fiber.Router, h Handlers, mw *middleware.MDWManager)
 	group.Post("/banner", mw.CheckAuthToken(constant.AdminRoles), h.AddBanner())
 	group.Patch("/banner/:banner_id", mw.CheckAuthToken(constant.AdminRoles), h.PatchBanner())
 	group.Delete("/banner/:banner_id", mw.CheckAuthToken(constant.AdminRoles), h.DeleteBanner())
+	group.Get("/banner_versions/:banner_id", mw.CheckAuthToken(constant.AdminRoles), h.ViewVersions())
+	group.Put("/banner_rollback/:banner_id/:version", mw.CheckAuthToken(constant.AdminRoles), h.BannerRollback())
 }

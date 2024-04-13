@@ -13,6 +13,8 @@ type Handlers interface {
 	AddBanner() fiber.Handler
 	PatchBanner() fiber.Handler
 	DeleteBanner() fiber.Handler
+	ViewVersions() fiber.Handler
+	BannerRollback() fiber.Handler
 }
 
 type BannersUseCase interface {
@@ -21,4 +23,6 @@ type BannersUseCase interface {
 	AddBanner(ctx context.Context, addBannerParams *banners_usecase.AddBanner) (models.BannerId, error)
 	PatchBanner(ctx context.Context, patchBannerParams *banners_usecase.PatchBanner) error
 	DeleteBanner(ctx context.Context, bannerId models.BannerId) error
+	ViewVersions(ctx context.Context, bannerId models.BannerId) (*[]models.FullBanner, error)
+	BannerRollback(ctx context.Context, bannerId models.BannerId, version int64) error
 }

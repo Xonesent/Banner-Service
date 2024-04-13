@@ -25,9 +25,12 @@ type PostgresRepository interface {
 	DeleteVersion(ctx context.Context, deleteVersionPostgresParams *banners_repository.DeleteVersionPostgres) error
 
 	DeleteBannerById(ctx context.Context, bannerId models.BannerId) error
+
+	GetBannerVersions(ctx context.Context, bannerId models.BannerId, versions []int64) (*[]models.FullBanner, error)
 }
 
 type RedisRepository interface {
 	PutBannerRedis(ctx context.Context, putRedisBannerParams *banners_repository.PutRedisBanner) error
 	GetBannerRedis(ctx context.Context, getRedisParams *banners_repository.GetRedisBanner) (*models.FullBanner, error)
+	DelBannerRedis(ctx context.Context, getRedisParams *banners_repository.GetRedisBanner) error
 }

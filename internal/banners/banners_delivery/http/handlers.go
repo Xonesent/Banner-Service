@@ -42,7 +42,7 @@ func (b *BannersHandlers) GetBanner() fiber.Handler {
 			return err
 		}
 
-		return c.JSON(bannerInfo)
+		return c.JSON(ToGetBannerResponse(bannerInfo))
 	}
 }
 
@@ -63,7 +63,7 @@ func (b *BannersHandlers) GetManyBanner() fiber.Handler {
 			return err
 		}
 
-		return c.JSON(manyBannerInfo)
+		return c.JSON(ToGetManyBannerResponse(manyBannerInfo))
 	}
 }
 
@@ -136,8 +136,53 @@ func (b *BannersHandlers) DeleteBanner() fiber.Handler {
 			return err
 		}
 
+		c.Status(fiber.StatusNoContent)
 		return c.JSON(fiber.Map{
-			"banner_id": bannerId,
+			"banner_id": "Success",
+		})
+	}
+}
+
+func (b *BannersHandlers) ViewVersions() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.PatchBanner")
+		defer span.End()
+
+		bannerId, err := strconv.Atoi(c.Params("banner_id"))
+		if err != nil {
+			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+		}
+
+		banners, err := b.bannersUC.ViewVersions(ctx, models.BannerId(bannerId))
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(banners)
+	}
+}
+
+func (b *BannersHandlers) BannerRollback() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		ctx, span := traces.StartFiberTrace(c, "BannersHandlers.PatchBanner")
+		defer span.End()
+
+		bannerId, err := strconv.Atoi(c.Params("banner_id"))
+		if err != nil {
+			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+		}
+		version, err := strconv.Atoi(c.Params("version"))
+		if err != nil {
+			return fiber.NewError(fiber.ErrBadRequest.Code, fmt.Sprintf("BannersHandlers.PatchBanner.Params; err = %s", err.Error()))
+		}
+
+		err = b.bannersUC.BannerRollback(ctx, models.BannerId(bannerId), int64(version))
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(fiber.Map{
+			"message": "Success",
 		})
 	}
 }

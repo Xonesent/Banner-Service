@@ -222,7 +222,7 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 			return err
 		}
 
-		err = b.bannersPGRepo.DeleteVersion(ctx, &banners_repository.DeleteVersionPostgres{Version: []int64{prevBanner.Version - 2}, BannerId: patchBannerParams.BannerId})
+		err = b.bannersPGRepo.DeleteVersion(ctx, &banners_repository.DeleteVersionPostgres{Version: []int64{prevBanner.Version - 3}, BannerId: patchBannerParams.BannerId})
 		if err != nil {
 			return err
 		}
@@ -250,8 +250,89 @@ func (b *BannersUC) DeleteBanner(ctx context.Context, bannerId models.BannerId) 
 		}
 
 		err = b.bannersPGRepo.DeleteVersion(ctx, &banners_repository.DeleteVersionPostgres{Version: []int64{}, BannerId: bannerId})
+		if err != nil {
+			return err
+		}
 		err = b.bannersPGRepo.DeleteTags(ctx, &banners_repository.DeleteTagsPostgres{TagIds: []models.TagId{}, BannerId: bannerId})
+		if err != nil {
+			return err
+		}
 		err = b.bannersPGRepo.DeleteBannerById(ctx, bannerId)
+		if err != nil {
+			return err
+		}
+		for _, tagId := range prevBanner.TagIds {
+			err = b.bannersRedisRepo.DelBannerRedis(ctx, &banners_repository.GetRedisBanner{TagId: tagId, FeatureId: prevBanner.FeatureId})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *BannersUC) ViewVersions(ctx context.Context, bannerId models.BannerId) (*[]models.FullBanner, error) {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.PatchBanner")
+	defer span.End()
+
+	var fullBanners []models.FullBanner
+	err := b.trManager.Do(ctx, func(ctx context.Context) error {
+		banner, err := b.bannersPGRepo.GetBannerById(ctx, bannerId)
+		if err != nil {
+			return err
+		}
+
+		if banner == nil {
+			return errors.New(fmt.Sprintf("impossible to view, banner with id %d doesnt exist", bannerId))
+		}
+		fullBanners = append(fullBanners, *banner)
+
+		banners, err := b.bannersPGRepo.GetBannerVersions(ctx, bannerId, []int64{})
+		if err != nil {
+			return err
+		}
+		fullBanners = append(fullBanners, *banners...)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &fullBanners, nil
+}
+
+func (b *BannersUC) BannerRollback(ctx context.Context, bannerId models.BannerId, version int64) error {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.PatchBanner")
+	defer span.End()
+
+	err := b.trManager.Do(ctx, func(ctx context.Context) error {
+		banner, err := b.bannersPGRepo.GetBannerVersions(ctx, bannerId, []int64{version})
+		if err != nil {
+			return err
+		}
+
+		if len(*banner) == 0 {
+			return errors.New(fmt.Sprintf("impossible to rollback, banner with id %d and version %d doesnt exist", bannerId, version))
+		}
+
+		err = b.PatchBanner(ctx, ToPatchBanner((*banner)[0]))
+		if err != nil {
+			return err
+		}
+
+		for _, tagId := range (*banner)[0].TagIds {
+			err = b.bannersRedisRepo.DelBannerRedis(ctx, &banners_repository.GetRedisBanner{TagId: tagId, FeatureId: (*banner)[0].FeatureId})
+			if err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 	if err != nil {

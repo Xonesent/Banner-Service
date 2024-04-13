@@ -19,7 +19,7 @@ func (s *Server) MapHandlers() (err error) {
 	bannersHandlers := banners_http.NewUserHandler(bannersUC, s.cfg)
 	mw := middleware.NewOfficiantMiddleware(s.cfg)
 
-	bannersGroup := s.fiber.Group("banners")
+	bannersGroup := s.fiber.Group("")
 
 	banners_http.MapBannersRoutes(bannersGroup, bannersHandlers, mw)
 
