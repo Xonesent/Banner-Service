@@ -42,7 +42,7 @@ type ExistBanner struct {
 }
 
 type AddTagsPostgres struct {
-	TagId    []models.TagId
+	TagIds   []models.TagId
 	BannerId models.BannerId
 }
 
@@ -63,4 +63,24 @@ type PutRedisBanner struct {
 type GetRedisBanner struct {
 	TagId     models.TagId
 	FeatureId models.FeatureId
+}
+
+type UpdateBannerById struct {
+	FeatureId *models.FeatureId
+	Title     *string
+	Text      *string
+	Url       *string
+	IsActive  *bool
+	BannerId  models.BannerId
+	Version   int64
+}
+
+type DeleteTagsPostgres struct {
+	TagIds   []models.TagId
+	BannerId models.BannerId
+}
+
+type DeleteVersionPostgres struct {
+	Version  []int64
+	BannerId models.BannerId
 }

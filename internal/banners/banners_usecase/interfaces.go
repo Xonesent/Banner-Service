@@ -17,6 +17,14 @@ type PostgresRepository interface {
 	CheckExist(ctx context.Context, checkExistBannerParams *banners_repository.CheckExistBanner) (*[]banners_repository.ExistBanner, error)
 	AddBannerPostgres(ctx context.Context, addPostgresBannerParams *banners_repository.AddPostgresBanner) (*banners_repository.GetInsertParams, error)
 	AddTags(ctx context.Context, addTagsPostgresParams *banners_repository.AddTagsPostgres) error
+
+	GetBannerById(ctx context.Context, bannerId models.BannerId) (*models.FullBanner, error)
+	UpdateBannerById(ctx context.Context, bannerId *banners_repository.UpdateBannerById) error
+	AddVersion(ctx context.Context, prevBanner *models.FullBanner) error
+	DeleteTags(ctx context.Context, deleteTagsPostgresParams *banners_repository.DeleteTagsPostgres) error
+	DeleteVersion(ctx context.Context, deleteVersionPostgresParams *banners_repository.DeleteVersionPostgres) error
+
+	DeleteBannerById(ctx context.Context, bannerId models.BannerId) error
 }
 
 type RedisRepository interface {

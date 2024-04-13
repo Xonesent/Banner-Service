@@ -6,6 +6,7 @@ import (
 
 type Banner struct {
 	BannerId  BannerId  `db:"banner_id"`
+	TagId     TagId     `db:"tag_id"`
 	FeatureId FeatureId `db:"feature_id"`
 	Title     string    `db:"title"`
 	Text      string    `db:"text"`
@@ -13,6 +14,7 @@ type Banner struct {
 	IsActive  bool      `db:"is_active"`
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
+	Version   int64     `db:"version"`
 }
 
 type FullBanner struct {
@@ -27,6 +29,7 @@ type FullBanner struct {
 	IsActive  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Version   int64
 }
 
 func (b *Banner) ToFullBanner(tagIds []TagId) *FullBanner {
@@ -42,6 +45,7 @@ func (b *Banner) ToFullBanner(tagIds []TagId) *FullBanner {
 		IsActive:  b.IsActive,
 		CreatedAt: b.CreatedAt,
 		UpdatedAt: b.UpdatedAt,
+		Version:   b.Version,
 	}
 }
 
@@ -57,5 +61,6 @@ func (b *Banner) ToFullBannerWithoutTagIds() *FullBanner {
 		IsActive:  b.IsActive,
 		CreatedAt: b.CreatedAt,
 		UpdatedAt: b.UpdatedAt,
+		Version:   b.Version,
 	}
 }

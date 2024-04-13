@@ -3,6 +3,7 @@ package banners_usecase
 import (
 	"avito/assignment/internal/banners/banners_repository"
 	"avito/assignment/internal/models"
+	"avito/assignment/pkg/utilities"
 )
 
 type GetBanner struct {
@@ -56,21 +57,21 @@ func (b *AddBanner) ToAddBannerPostgres() *banners_repository.AddPostgresBanner 
 	}
 }
 
-func (b *AddBanner) ToPutRedisBanner(getInsertParams *banners_repository.GetInsertParams) *banners_repository.PutRedisBanner {
-	return &banners_repository.PutRedisBanner{
-		BannerId:  getInsertParams.BannerId,
-		TagIds:    b.TagIds,
-		FeatureId: b.FeatureId,
-		Content: struct {
-			Title string
-			Text  string
-			Url   string
-		}{Title: b.Content.Title, Text: b.Content.Text, Url: b.Content.Url},
-		IsActive:  b.IsActive,
-		CreatedAt: getInsertParams.CreatedAt,
-		UpdatedAt: getInsertParams.UpdatedAt,
-	}
-}
+//func (b *AddBanner) ToPutRedisBanner(getInsertParams *banners_repository.GetInsertParams) *banners_repository.PutRedisBanner {
+//	return &banners_repository.PutRedisBanner{
+//		BannerId:  getInsertParams.BannerId,
+//		TagIds:    b.TagIds,
+//		FeatureId: b.FeatureId,
+//		Content: struct {
+//			Title string
+//			Text  string
+//			Url   string
+//		}{Title: b.Content.Title, Text: b.Content.Text, Url: b.Content.Url},
+//		IsActive:  b.IsActive,
+//		CreatedAt: getInsertParams.CreatedAt,
+//		UpdatedAt: getInsertParams.UpdatedAt,
+//	}
+//}
 
 func ToPutRedisBanner(fullBanner *models.FullBanner) *banners_repository.PutRedisBanner {
 	return &banners_repository.PutRedisBanner{
@@ -86,4 +87,56 @@ func ToPutRedisBanner(fullBanner *models.FullBanner) *banners_repository.PutRedi
 		CreatedAt: fullBanner.CreatedAt,
 		UpdatedAt: fullBanner.UpdatedAt,
 	}
+}
+
+type PatchBanner struct {
+	TagIds    *[]models.TagId
+	FeatureId *models.FeatureId
+	Title     *string
+	Text      *string
+	Url       *string
+	IsActive  *bool
+	BannerId  models.BannerId
+}
+
+func (b *PatchBanner) ToPatchBanner(version int64) *banners_repository.UpdateBannerById {
+	return &banners_repository.UpdateBannerById{
+		FeatureId: b.FeatureId,
+		Title:     b.Title,
+		Text:      b.Text,
+		Url:       b.Url,
+		IsActive:  b.IsActive,
+		BannerId:  b.BannerId,
+		Version:   version,
+	}
+}
+
+func (b *PatchBanner) Check(banner *models.FullBanner) bool {
+	if b.FeatureId == nil && b.IsActive == nil && b.TagIds == nil && b.Url == nil && b.Text == nil && b.Title == nil {
+		return true
+	}
+	var maxCoincidence, currCoincidence int = 6, 0
+	if b.FeatureId == nil || b.FeatureId != nil && *b.FeatureId == banner.FeatureId {
+		currCoincidence++
+	}
+	if b.IsActive == nil || b.IsActive != nil && *b.IsActive == banner.IsActive {
+		currCoincidence++
+	}
+	if b.Url == nil || b.Url != nil && *b.Url == banner.Content.Url {
+		currCoincidence++
+	}
+	if b.Text == nil || b.Text != nil && *b.Text == banner.Content.Text {
+		currCoincidence++
+	}
+	if b.Title == nil || b.Title != nil && *b.Title == banner.Content.Title {
+		currCoincidence++
+	}
+	if b.TagIds == nil {
+		currCoincidence++
+	} else {
+		if utilities.AreSlicesEqual(*b.TagIds, banner.TagIds) {
+			currCoincidence++
+		}
+	}
+	return currCoincidence == maxCoincidence
 }

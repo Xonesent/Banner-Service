@@ -3,6 +3,7 @@ package banners_http
 import (
 	"avito/assignment/internal/banners/banners_usecase"
 	"avito/assignment/internal/models"
+	"avito/assignment/pkg/utilities"
 )
 
 type GetBannerRequest struct {
@@ -29,6 +30,17 @@ type AddBannerRequest struct {
 	IsActive bool `json:"is_active" validate:"required"`
 }
 
+type PatchBannerRequest struct {
+	TagIds    *[]models.TagId   `json:"tag_ids"`
+	FeatureId *models.FeatureId `json:"feature_id"`
+	Content   *struct {
+		Title *string `json:"title"`
+		Text  *string `json:"text"`
+		Url   *string `json:"url"`
+	} `json:"content"`
+	IsActive *bool `json:"is_active"`
+}
+
 func (b *GetBannerRequest) ToGetBanner() *banners_usecase.GetBanner {
 	return &banners_usecase.GetBanner{
 		TagId:          b.TagId,
@@ -48,7 +60,7 @@ func (b *GetManyBannerRequest) ToGetManyBanner() *banners_usecase.GetManyBanner 
 
 func (b *AddBannerRequest) ToAddBanner() *banners_usecase.AddBanner {
 	return &banners_usecase.AddBanner{
-		TagIds:    b.TagIds,
+		TagIds:    utilities.RemoveDuplicates[models.TagId](b.TagIds),
 		FeatureId: b.FeatureId,
 		Content: struct {
 			Title string
@@ -56,5 +68,37 @@ func (b *AddBannerRequest) ToAddBanner() *banners_usecase.AddBanner {
 			Url   string
 		}{Title: b.Content.Title, Text: b.Content.Text, Url: b.Content.Url},
 		IsActive: b.IsActive,
+	}
+}
+
+func (b *PatchBannerRequest) ToPatchBanner(bannerId models.BannerId) *banners_usecase.PatchBanner {
+	if b.Content == nil {
+		return &banners_usecase.PatchBanner{
+			TagIds: func(*[]models.TagId) *[]models.TagId {
+				if b.TagIds != nil {
+					ids := utilities.RemoveDuplicates[models.TagId](*b.TagIds)
+					return &ids
+				}
+				return nil
+			}(b.TagIds),
+			FeatureId: b.FeatureId,
+			IsActive:  b.IsActive,
+			BannerId:  bannerId,
+		}
+	}
+	return &banners_usecase.PatchBanner{
+		TagIds: func(*[]models.TagId) *[]models.TagId {
+			if b.TagIds != nil {
+				ids := utilities.RemoveDuplicates[models.TagId](*b.TagIds)
+				return &ids
+			}
+			return nil
+		}(b.TagIds),
+		FeatureId: b.FeatureId,
+		Title:     b.Content.Title,
+		Text:      b.Content.Text,
+		Url:       b.Content.Url,
+		IsActive:  b.IsActive,
+		BannerId:  bannerId,
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"go.opentelemetry.io/otel"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -221,6 +222,7 @@ func (b *BannersRepo) AddBannerPostgres(ctx context.Context, addPostgresBannerPa
 			time.Now(),
 			time.Now(),
 			addPostgresBannerParams.IsActive,
+			1,
 		).
 		Suffix("RETURNING banner_id,created_at,updated_at").
 		PlaceholderFormat(sq.Dollar).ToSql()
@@ -278,7 +280,7 @@ func (b *BannersRepo) AddTags(ctx context.Context, addTagsPostgresParams *AddTag
 
 	sqlBuilder := sq.Insert(sql_queries.BannersXTagsTableName).Columns(sql_queries.InsertTagColumns...)
 
-	for _, tagId := range addTagsPostgresParams.TagId {
+	for _, tagId := range addTagsPostgresParams.TagIds {
 		sqlBuilder = sqlBuilder.Values(addTagsPostgresParams.BannerId, tagId)
 	}
 
@@ -290,6 +292,207 @@ func (b *BannersRepo) AddTags(ctx context.Context, addTagsPostgresParams *AddTag
 	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
 	if _, err = tr.ExecContext(ctx, query, args...); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.AddTags.ExecContext; err = %s", err.Error()))
+	}
+
+	return nil
+}
+
+func (b *BannersRepo) GetBannerById(ctx context.Context, bannerId models.BannerId) (*models.FullBanner, error) {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.GetBannerById")
+	defer span.End()
+
+	fullBanner := &models.FullBanner{}
+
+	query, args, err := sq.Select(sql_queries.GetFullBannerColumns...).
+		From(fmt.Sprintf("%s b", sql_queries.BannersTableName)).
+		InnerJoin(fmt.Sprintf("%s bxt ON bxt.banner_id = b.banner_id", sql_queries.BannersXTagsTableName)).
+		Where(
+			sq.And{
+				sq.Eq{"b." + sql_queries.BannerIdColumnName: bannerId},
+			},
+		).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.GetBannerPostgres.SelectContext; err = %s", err.Error()))
+	}
+
+	var banner models.Banner
+	var firstRow bool = true
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+	rows, err := tr.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.StructScan(&banner); err != nil {
+			return nil, err
+		}
+		if firstRow {
+			fullBanner = banner.ToFullBanner([]models.TagId{banner.TagId})
+			firstRow = false
+		} else {
+			fullBanner.TagIds = append(fullBanner.TagIds, banner.TagId)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return fullBanner, nil
+}
+
+func (b *BannersRepo) UpdateBannerById(ctx context.Context, updateBannerByIdParams *UpdateBannerById) error {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.GetBannerById")
+	defer span.End()
+
+	sqlBuilder := sq.Update(sql_queries.BannersTableName)
+	sqlBuilder = filter(sqlBuilder, updateBannerByIdParams)
+
+	query, args, err := sqlBuilder.
+		Where(sq.Eq{sql_queries.BannerIdColumnName: updateBannerByIdParams.BannerId}).
+		PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return err
+	}
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+
+	_, err = tr.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func filter(sqlBuilder sq.UpdateBuilder, updateBannerByIdParams *UpdateBannerById) sq.UpdateBuilder {
+	if updateBannerByIdParams.FeatureId != nil {
+		sqlBuilder = sqlBuilder.Set(sql_queries.FeatureIdColumnName, updateBannerByIdParams.FeatureId)
+	}
+	if updateBannerByIdParams.Title != nil {
+		sqlBuilder = sqlBuilder.Set(sql_queries.TitleColumnName, updateBannerByIdParams.Title)
+	}
+	if updateBannerByIdParams.Text != nil {
+		sqlBuilder = sqlBuilder.Set(sql_queries.TextColumnName, updateBannerByIdParams.Text)
+	}
+	if updateBannerByIdParams.Url != nil {
+		sqlBuilder = sqlBuilder.Set(sql_queries.UrlColumnName, updateBannerByIdParams.Url)
+	}
+	if updateBannerByIdParams.IsActive != nil {
+		sqlBuilder = sqlBuilder.Set(sql_queries.IsActiveColumnName, updateBannerByIdParams.IsActive)
+	}
+	sqlBuilder = sqlBuilder.Set(sql_queries.UpdatedAtColumnName, time.Now())
+	sqlBuilder = sqlBuilder.Set(sql_queries.VersionColumnName, updateBannerByIdParams.Version+1)
+
+	return sqlBuilder
+}
+
+func (b *BannersRepo) AddVersion(ctx context.Context, prevBanner *models.FullBanner) error {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.AddBannerPostgres")
+	defer span.End()
+
+	var tagIdsStr string
+	for _, id := range prevBanner.TagIds {
+		tagIdsStr += fmt.Sprintf("%d,", id)
+	}
+	tagIdsStr = "{" + strings.TrimSuffix(tagIdsStr, ",") + "}"
+
+	query, args, err := sq.Insert(sql_queries.BannersVersionsTableName).
+		Columns(sql_queries.InsertVersionColumns...).
+		Values(
+			prevBanner.BannerId,
+			prevBanner.Content.Title,
+			prevBanner.Content.Text,
+			prevBanner.Content.Url,
+			prevBanner.FeatureId,
+			tagIdsStr,
+			prevBanner.CreatedAt,
+			prevBanner.UpdatedAt,
+			prevBanner.IsActive,
+			prevBanner.Version,
+		).
+		PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.AddVersion.Insert; err = %s", err.Error()))
+	}
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+	if _, err = tr.ExecContext(ctx, query, args...); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.AddVersion.ExecContext; err = %s", err.Error()))
+	}
+
+	return nil
+}
+
+func (b *BannersRepo) DeleteTags(ctx context.Context, deleteTagsPostgresParams *DeleteTagsPostgres) error {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.AddTags")
+	defer span.End()
+
+	var conditions sq.And
+	conditions = append(conditions, sq.Eq{sql_queries.BannerIdColumnName: deleteTagsPostgresParams.BannerId})
+	if len(deleteTagsPostgresParams.TagIds) != 0 {
+		conditions = append(conditions, sq.Eq{sql_queries.VersionColumnName: deleteTagsPostgresParams.TagIds})
+	}
+
+	query, args, err := sq.Delete(sql_queries.BannersXTagsTableName).
+		Where(conditions).
+		PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.DeleteTags.Insert; err = %s", err.Error()))
+	}
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+	if _, err = tr.ExecContext(ctx, query, args...); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.DeleteTags.ExecContext; err = %s", err.Error()))
+	}
+
+	return nil
+}
+
+func (b *BannersRepo) DeleteVersion(ctx context.Context, deleteVersionPostgresParams *DeleteVersionPostgres) error {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.AddTags")
+	defer span.End()
+
+	var conditions sq.And
+	conditions = append(conditions, sq.Eq{sql_queries.BannerIdColumnName: deleteVersionPostgresParams.BannerId})
+	if len(deleteVersionPostgresParams.Version) != 0 {
+		conditions = append(conditions, sq.Eq{sql_queries.VersionColumnName: deleteVersionPostgresParams.Version})
+	}
+
+	query, args, err := sq.Delete(sql_queries.BannersVersionsTableName).
+		Where(conditions).
+		PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.DeleteTags.Insert; err = %s", err.Error()))
+	}
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+	if _, err = tr.ExecContext(ctx, query, args...); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.DeleteTags.ExecContext; err = %s", err.Error()))
+	}
+
+	return nil
+}
+
+func (b *BannersRepo) DeleteBannerById(ctx context.Context, bannerId models.BannerId) error {
+	ctx, span := otel.Tracer("").Start(ctx, "BannersRepo.AddTags")
+	defer span.End()
+
+	query, args, err := sq.Delete(sql_queries.BannersTableName).
+		Where(sq.Eq{sql_queries.BannerIdColumnName: bannerId}).
+		PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.DeleteTags.Insert; err = %s", err.Error()))
+	}
+
+	tr := b.txGetter.DefaultTrOrDB(ctx, b.db)
+	if _, err = tr.ExecContext(ctx, query, args...); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("BannersRepo.DeleteTags.ExecContext; err = %s", err.Error()))
 	}
 
 	return nil
