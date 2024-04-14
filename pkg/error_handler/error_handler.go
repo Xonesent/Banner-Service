@@ -18,15 +18,17 @@ func FiberErrorHandler(ctx *fiber.Ctx, err error) error {
 	errorInfo := strings.Split(err.Error(), "|")
 	if utilities.InStringSlice(constant.Host, constant.DevHosts) {
 		return ctx.JSON(map[string]interface{}{
-			"data":        nil,
 			"trace-id":    traceId,
 			"error_place": errorInfo[0],
-			"error_value": errorInfo[1],
-			"error_args":  errorInfo[2],
+			"error_value": func(errorInfo []string) string {
+				if len(errorInfo) == 1 {
+					return "nil"
+				}
+				return errorInfo[1]
+			}(errorInfo),
 		})
 	}
 	return ctx.JSON(map[string]interface{}{
-		"data":     nil,
 		"trace-id": traceId,
 	})
 

@@ -13,13 +13,6 @@ type GetBanner struct {
 	AuthToken      string
 }
 
-func (b *GetBanner) ToGetBannerRedis() *banners_repository.GetRedisBanner {
-	return &banners_repository.GetRedisBanner{
-		TagId:     b.TagId,
-		FeatureId: b.FeatureId,
-	}
-}
-
 type GetManyBanner struct {
 	FeatureId *models.FeatureId
 	TagId     *models.TagId

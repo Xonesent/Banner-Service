@@ -16,18 +16,18 @@ CREATE TABLE banner_schema.banners(
 
 CREATE TABLE banner_schema.banners_X_tags(
     id     BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    banner_id INTEGER,
-    tag_id INTEGER,
+    banner_id BIGINT,
+    tag_id BIGINT,
     FOREIGN KEY (banner_id) REFERENCES banner_schema.banners(banner_id)
 );
 
 CREATE TABLE banner_schema.banners_versions(
     id     BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    banner_id INTEGER,
+    banner_id BIGINT,
     title TEXT,
     text TEXT,
     url TEXT,
-    feature_id INTEGER,
+    feature_id BIGINT,
     tag_ids BIGINT ARRAY,
     created_at TIMESTAMP,
     updated_at TIMESTAMP,

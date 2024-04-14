@@ -33,14 +33,14 @@ func NewBannersUC(cfg *config.Config, trManager *manager.Manager, bannersRepo Po
 }
 
 // GetBanner (берем случай с use_last_version = false, так как он сложнее)
-// 1. Запрашиваем редис отдать запись, если удается - то сразе ее возвращаем
+// 1. Запрашиваем редис отдать запись, если удается - то сразу ее возвращаем
 // 2. Если нам не удалось ее получить, то берем ее из постгреса и кладем в редис
 func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (*models.FullBanner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetBanner")
 	defer span.End()
 
 	if !getBannerParams.UseLastVersion {
-		fullBanner, err := b.bannersRedisRepo.GetBannerRedis(ctx, getBannerParams.ToGetBannerRedis())
+		fullBanner, err := b.bannersRedisRepo.GetBannerRedis(ctx, getBannerParams.FeatureId, getBannerParams.TagId)
 		if err != nil && !errors.Is(err, fiber.ErrNotFound) {
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBan
 			}
 		} else {
 			if patchBannerParams.TagIds != nil {
-				existBanners, err = b.bannersPGRepo.CheckExist(ctx, addTags, *patchBannerParams.FeatureId)
+				existBanners, err = b.bannersPGRepo.CheckExist(ctx, addTags, prevBanner.FeatureId)
 				if err != nil {
 					return err
 				}
@@ -287,7 +287,7 @@ func (b *BannersUC) DeleteBanner(ctx context.Context, bannerId models.BannerId) 
 			return err
 		}
 		for _, tagId := range prevBanner.TagIds {
-			err = b.bannersRedisRepo.DelBannerRedis(ctx, &banners_repository.GetRedisBanner{TagId: tagId, FeatureId: prevBanner.FeatureId})
+			err = b.bannersRedisRepo.DelBannerRedis(ctx, prevBanner.FeatureId, tagId)
 			if err != nil {
 				return err
 			}
@@ -315,9 +315,9 @@ func (b *BannersUC) ViewVersions(ctx context.Context, bannerId models.BannerId) 
 			return err
 		}
 
-		if banner == nil {
+		if banner.BannerId == 0 {
 			return traces.SpanSetErrWrap(span, errlst.HttpErrNotFound,
-				errors.New(fmt.Sprintf("impossible to delete, banner with id %d doesnt exist", bannerId)), "BannersUC.ViewVersions.DoNotExist")
+				errors.New(fmt.Sprintf("impossible to view versions, banner with id %d doesnt exist", bannerId)), "BannersUC.ViewVersions.DoNotExist")
 		}
 		fullBanners = append(fullBanners, *banner)
 
@@ -360,7 +360,7 @@ func (b *BannersUC) BannerRollback(ctx context.Context, bannerId models.BannerId
 		}
 
 		for _, tagId := range (*banner)[0].TagIds {
-			err = b.bannersRedisRepo.DelBannerRedis(ctx, &banners_repository.GetRedisBanner{TagId: tagId, FeatureId: (*banner)[0].FeatureId})
+			err = b.bannersRedisRepo.DelBannerRedis(ctx, (*banner)[0].FeatureId, tagId)
 			if err != nil {
 				return err
 			}

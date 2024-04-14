@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// Banner взаимодействие с бд (есть tag_id, чтобы работать с join запросами)
 type Banner struct {
 	BannerId  BannerId  `db:"banner_id"`
 	TagId     TagId     `db:"tag_id"`
@@ -17,6 +18,7 @@ type Banner struct {
 	Version   int64     `db:"version"`
 }
 
+// FullBanner структура, которую хотят получать админы
 type FullBanner struct {
 	BannerId  BannerId
 	TagIds    []TagId

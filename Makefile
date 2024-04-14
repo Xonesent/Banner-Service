@@ -7,6 +7,9 @@ first_build:
 run:
 	go run .\cmd\main.go
 
+compose:
+	docker-compose up
+
 init_postgres:
 	docker run --name postgres_avito -e POSTGRES_PASSWORD='test' -e POSTGRES_DB='avito' -e POSTGRES_USER='postgres'  -d -p 54325:5432 postgres
 

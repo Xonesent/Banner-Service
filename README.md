@@ -13,9 +13,9 @@ Before proceeding, ensure you have the following installed on your system:
 
 Follow these steps to set up and run the application:
 
-### Step 1: Start Redis and PostgreSQL
+### Step 1: Start Redis, PostgreSQL and Jaeger
 
-Firstly, start the Redis and PostgreSQL services using Docker Compose. Run the following command in the root of your project directory:
+Firstly, start the Redis, PostgreSQL and Jaeger services using Docker Compose. Run the following command in the root of your project directory:
 
 ```bash
 docker-compose up
@@ -36,3 +36,14 @@ Finally, to start the application, execute the following command:
 ```bash
 go run ./cmd/main.go
 ```
+
+## My impressions and thoughts
+
+Throughout the project I have left readme files that will emphasize my reasoning and also leave questions that I would like to get answers to in the feedback. I'm sure some of the questions will be debatable, so I won't be too upset if there is no answer to them  
+- In internal = about performance and functionality
+- In migrations = about constraints and why I made these particular table structures.
+- In pkg = about architecture, my assumptions about what could be done better
+
+Would be happy to get feedback / advice!  
+Email - 1pyankov.d.s@gmail.com  
+Telegram - @Xonesent

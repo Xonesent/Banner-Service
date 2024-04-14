@@ -28,7 +28,7 @@ type AddBannerRequest struct {
 		Text  string `json:"text" validate:"required"`
 		Url   string `json:"url" validate:"required"`
 	} `json:"content"`
-	IsActive bool `json:"is_active" validate:"required"`
+	IsActive bool `json:"is_active"`
 }
 
 type PatchBannerRequest struct {

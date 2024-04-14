@@ -74,10 +74,10 @@ func (b *BannersHandlers) AddBanner() fiber.Handler {
 
 		addBanner := AddBannerRequest{}
 		if err := reqvalidator.ReadRequest(c, &addBanner); err != nil {
-			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, err, "BannersHandlers.GetManyBanner.ReadRequest")
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, err, "BannersHandlers.AddBanner.ReadRequest")
 		}
 		if len(addBanner.TagIds) == 0 {
-			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.GetManyBanner.NilTagIds")
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.AddBanner.NilTagIds")
 		}
 
 		addBannerDTO := addBanner.ToAddBanner()
@@ -105,7 +105,7 @@ func (b *BannersHandlers) PatchBanner() fiber.Handler {
 		}
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.PatchBanner.NilBannerParams")
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.PatchBanner.WrongBannerParams")
 		}
 
 		patchBannerDTO := patchBanner.ToPatchBanner(models.BannerId(bannerId))
@@ -128,7 +128,7 @@ func (b *BannersHandlers) DeleteBanner() fiber.Handler {
 
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.DeleteBanner.NilBannerParams")
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.DeleteBanner.WrongBannerParams")
 		}
 
 		err = b.bannersUC.DeleteBanner(ctx, models.BannerId(bannerId))
@@ -138,7 +138,7 @@ func (b *BannersHandlers) DeleteBanner() fiber.Handler {
 
 		c.Status(fiber.StatusNoContent)
 		return c.JSON(fiber.Map{
-			"banner_id": "Success",
+			"message": "Success",
 		})
 	}
 }
@@ -150,7 +150,7 @@ func (b *BannersHandlers) ViewVersions() fiber.Handler {
 
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.NilBannerParams")
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.WrongBannerParams")
 		}
 
 		banners, err := b.bannersUC.ViewVersions(ctx, models.BannerId(bannerId))
@@ -169,11 +169,11 @@ func (b *BannersHandlers) BannerRollback() fiber.Handler {
 
 		bannerId, err := strconv.Atoi(c.Params("banner_id"))
 		if err != nil {
-			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.NilBannerParams")
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.WrongBannerParams")
 		}
 		version, err := strconv.Atoi(c.Params("version"))
 		if err != nil {
-			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.NilVersionParams")
+			return traces.SpanSetErrWrap(span, errlst.HttpErrInvalidRequest, nil, "BannersHandlers.ViewVersions.WrongVersionParams")
 		}
 
 		err = b.bannersUC.BannerRollback(ctx, models.BannerId(bannerId), int64(version))

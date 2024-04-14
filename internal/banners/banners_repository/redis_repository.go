@@ -47,12 +47,12 @@ func (r *ClientRedisRepo) PutBannerRedis(ctx context.Context, putRedisBannerPara
 	return nil
 }
 
-func (r *ClientRedisRepo) GetBannerRedis(ctx context.Context, getRedisParams *GetRedisBanner) (*models.FullBanner, error) {
+func (r *ClientRedisRepo) GetBannerRedis(ctx context.Context, featureId models.FeatureId, tagId models.TagId) (*models.FullBanner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "ClientRedisRepo.GetBannerRedis")
 	defer span.End()
 
 	result := &models.FullBanner{}
-	key := r.createDbKey(getRedisParams.TagId, getRedisParams.FeatureId)
+	key := r.createDbKey(tagId, featureId)
 
 	valueString, err := r.db.Get(ctx, key).Result()
 	if err != nil && errors.Is(err, redis.Nil) {
@@ -69,11 +69,11 @@ func (r *ClientRedisRepo) GetBannerRedis(ctx context.Context, getRedisParams *Ge
 	return result, nil
 }
 
-func (r *ClientRedisRepo) DelBannerRedis(ctx context.Context, delRedisParams *GetRedisBanner) error {
+func (r *ClientRedisRepo) DelBannerRedis(ctx context.Context, featureId models.FeatureId, tagId models.TagId) error {
 	ctx, span := otel.Tracer("").Start(ctx, "AdminRedisRepo.DelSession")
 	defer span.End()
 
-	regex := r.createDbKey(delRedisParams.TagId, delRedisParams.FeatureId)
+	regex := r.createDbKey(tagId, featureId)
 	keys := make([]string, 0, 10)
 
 	iter := r.db.Scan(ctx, 0, regex, 0).Iterator()

@@ -29,6 +29,6 @@ type PostgresRepository interface {
 
 type RedisRepository interface {
 	PutBannerRedis(ctx context.Context, putRedisBannerParams *banners_repository.PutRedisBanner) error
-	GetBannerRedis(ctx context.Context, getRedisParams *banners_repository.GetRedisBanner) (*models.FullBanner, error)
-	DelBannerRedis(ctx context.Context, getRedisParams *banners_repository.GetRedisBanner) error
+	GetBannerRedis(ctx context.Context, featureId models.FeatureId, tagId models.TagId) (*models.FullBanner, error)
+	DelBannerRedis(ctx context.Context, featureId models.FeatureId, tagId models.TagId) error
 }
