@@ -83,7 +83,7 @@ func (b *BannersUC) GetBanner(ctx context.Context, getBannerParams *GetBanner) (
 
 // GetManyBanner
 // 1. Просим из постгреса все записи из бд с баннерами соответствующие требованиям
-// 2. Добавляем к каждой записи тэг айдишники из бд с тэгайдишниками
+// 2. Добавляем к каждой записи тэг айдишники из бд с тэгами
 func (b *BannersUC) GetManyBanner(ctx context.Context, getManyBannerParams *GetManyBanner) (*[]models.FullBanner, error) {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.GetManyBanner")
 	defer span.End()
@@ -165,7 +165,7 @@ func (b *BannersUC) AddBanner(ctx context.Context, addBannerParams *AddBanner) (
 // 4. Обновляю баннер
 // 5. Удаляю + добавляю тэги, чтобы они соответствовали запросу
 // 6. Добавляю версию в бд с версиями
-// 7. Удаляю пятую версию баннера в бд, в readme будет дискуссия на эту тему
+// 7. Удаляю пятую версию баннера в бд (костыльно, но лучше не придумать наверное)
 func (b *BannersUC) PatchBanner(ctx context.Context, patchBannerParams *PatchBanner) error {
 	ctx, span := otel.Tracer("").Start(ctx, "BannersUC.PatchBanner")
 	defer span.End()
